@@ -26,10 +26,11 @@ for work in all_works_html:
         path = (
             path if path.startswith("..") else "../../antholog/scheusal/scheusal.html"
         )
-        title = re.sub(r"\W+", " ", link.text)
+        title = re.sub(r"\s+", " ", link.text)
         genres = work.findChild("i")
         genres = [] if genres == None else genres.text.split(",")
         genres = [s.strip() for s in genres]
+        genres = [re.sub(r"\s+", " ", g) for g in genres]
 
         abspath = urllib.parse.urljoin(root_path, path)
 
@@ -54,6 +55,7 @@ for work_index, work in enumerate(tqdm(all_works)):
         chapter_html = BeautifulSoup(requests.get(abspath).content, features="lxml")
         paragraphs = chapter_html.find_all(name="p")
         paragraphs = [p.text for p in paragraphs]
+        paragraphs = [re.sub(r"\s+", " ", p) for p in paragraphs]
         paragraphs = [p for p in paragraphs if not p.isspace() and not p == ""]
 
         work_chapters.append({"name": name, "index": index, "paragraphs": paragraphs})
@@ -65,4 +67,4 @@ for work_index, work in enumerate(tqdm(all_works)):
         json.dump(work_dict, f, ensure_ascii=False)
 
     # rate limit
-    time.sleep(1)
+    time.sleep(0.5)
