@@ -39,7 +39,12 @@ for work in all_works_html:
         )
 
 for work_index, work in enumerate(tqdm(all_works)):
-    work_html = BeautifulSoup(requests.get(work["path"]).content, features="lxml")
+    try:
+        html = requests.get(work["path"], timeout=10).content
+    except:
+        print(work, work_index)
+        continue
+    work_html = BeautifulSoup(html, features="lxml")
 
     chapters = work_html.find(class_="dropdown-content")
     chapters = [] if chapters == None else chapters.findChildren("li")
@@ -52,7 +57,12 @@ for work_index, work in enumerate(tqdm(all_works)):
         index = idx
         abspath = urllib.parse.urljoin(work["path"], chapter_path)
 
-        chapter_html = BeautifulSoup(requests.get(abspath).content, features="lxml")
+        try:
+            html = requests.get(abspath, timeout=10).content
+        except:
+            print(work, work_index)
+            break
+        chapter_html = BeautifulSoup(html, features="lxml")
         paragraphs = chapter_html.find_all(name="p")
         paragraphs = [p.text for p in paragraphs]
         paragraphs = [re.sub(r"\s+", " ", p) for p in paragraphs]
@@ -67,4 +77,4 @@ for work_index, work in enumerate(tqdm(all_works)):
         json.dump(work_dict, f, ensure_ascii=False)
 
     # rate limit
-    time.sleep(0.5)
+    time.sleep(1)
