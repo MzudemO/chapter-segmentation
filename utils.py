@@ -1,4 +1,6 @@
 import numpy as np
+from typing import List
+
 
 # taken from keras to avoid dependency
 
@@ -36,3 +38,30 @@ def pad_sequences(
         elif padding == "pre":
             x[idx, -len(trunc) :] = trunc
     return x
+
+SENTENCE_SEP_TOKENS = [".", "!", "?"]
+def take_sentences_from_start(paragraph: List[str], length: int) -> List[str]:
+    output = paragraph[:length]
+    period_indices = [
+        index for index, token in enumerate(output) if token in SENTENCE_SEP_TOKENS
+    ]
+    if length >= len(paragraph):
+        period_indices = period_indices[
+            :-1
+        ]  # the paragraph ends on a sentence separator
+    if period_indices == []:
+        return output
+    else:
+        return output[: period_indices[-1]]
+
+
+def take_sentences_from_end(paragraph: List[str], length: int) -> List[str]:
+    output = paragraph[-length:]
+    period_indices = [
+        index for index, token in enumerate(output) if token in SENTENCE_SEP_TOKENS
+    ]
+    period_indices = period_indices[:-1]  # the paragraph ends on a sentence separator
+    if period_indices == []:
+        return output
+    else:
+        return output[period_indices[0] + 1 :]

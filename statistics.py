@@ -36,6 +36,8 @@ plt.savefig("figures/genre_frequencies.png", bbox_inches="tight")
 # Count books with genres we don't want
 genre_df = books_df.explode(column="genres")
 print("Lyrik: ", len(genre_df[genre_df["genres"] == "Lyrik"]))
+print("Cartoons: ", len(genre_df[genre_df["genres"] == "Cartoons"]))
+print("Musik: ", len(genre_df[genre_df["genres"] == "Musik"]))
 print("Dramatik: ", len(genre_df[genre_df["genres"] == "Dramatik"]))
 print("Anthologie: ", len(genre_df[genre_df["genres"] == "Anthologie"]))
 print("Fabeln: ", len(genre_df[genre_df["genres"] == "Fabeln"]))

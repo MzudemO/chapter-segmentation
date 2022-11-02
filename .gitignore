@@ -1,3 +1,4 @@
 .vscode/
 corpus*/
 __pycache__/
+*.pkl

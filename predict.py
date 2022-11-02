@@ -1,4 +1,3 @@
-from xmlrpc.client import Boolean
 import torch
 from transformers import BertTokenizer, BertForNextSentencePrediction
 from utils import pad_sequences
@@ -33,7 +32,7 @@ def take_sentences_from_end(paragraph: List[str], length: int) -> List[str]:
     if period_indices == []:
         return output
     else:
-        return output[period_indices[0] :]
+        return output[period_indices[0] + 1 :]
 
 
 def predict_single(
@@ -49,9 +48,11 @@ def predict_single(
 
     toks1 = take_sentences_from_end(toks1, 254)
     toks2 = take_sentences_from_start(toks2, 254)
+    # toks1 = toks1[-254:]
+    # toks2 = toks2[:254]
 
-    # print("S1:", " ".join(toks1))
-    # print("S2:", " ".join(toks2))
+    print("S1:", " ".join(toks1))
+    print("S2:", " ".join(toks2))
 
     toks1 = tokenizer.convert_tokens_to_ids(toks1)
     toks2 = tokenizer.convert_tokens_to_ids(toks2)
@@ -116,7 +117,7 @@ if __name__ == "__main__":
 
     predictions = []
 
-    for book_name in range(10):
+    for book_name in [0, 1]:
         book = {}
         with open(f"corpus/{book_name}.json", "r", encoding="utf8") as f:
             book = json.load(f)
