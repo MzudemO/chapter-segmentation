@@ -4,13 +4,10 @@ from typing import List
 
 # taken from keras to avoid dependency
 
+
 def pad_sequences(
-    sequences,
-    maxlen=None,
-    dtype="int32",
-    padding="pre",
-    truncating="pre",
-    value=0.0):
+    sequences, maxlen=None, dtype="int32", padding="pre", truncating="pre", value=0.0
+):
     num_samples = len(sequences)
 
     lengths = []
@@ -39,7 +36,10 @@ def pad_sequences(
             x[idx, -len(trunc) :] = trunc
     return x
 
+
 SENTENCE_SEP_TOKENS = [".", "!", "?"]
+
+
 def take_sentences_from_start(paragraph: List[str], length: int) -> List[str]:
     output = paragraph[:length]
     period_indices = [
@@ -65,3 +65,9 @@ def take_sentences_from_end(paragraph: List[str], length: int) -> List[str]:
         return output
     else:
         return output[period_indices[0] + 1 :]
+
+
+def flat_accuracy(preds, labels):
+    pred_flat = np.argmax(preds, axis=1).flatten()
+    labels_flat = labels.flatten()
+    return np.sum(pred_flat == labels_flat) / len(labels_flat)

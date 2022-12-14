@@ -1,9 +1,12 @@
 import datasets
-from transformers import BertTokenizer, BertForNextSentencePrediction
 import torch
-from torch.utils.data import DataLoader
 from torch.optim import AdamW
+from torch.utils.data import DataLoader
 from tqdm import tqdm
+from transformers import BertForNextSentencePrediction, BertTokenizer
+import evaluate
+
+from utils import flat_accuracy
 
 
 def preprocess(example, tokenizer):
@@ -22,8 +25,6 @@ def preprocess(example, tokenizer):
 
     output = batch_encoding
     output["label"] = torch.tensor(labels, dtype=torch.long)
-    # print(output)
-    # input("lol")
     return output
 
 
@@ -40,21 +41,21 @@ if __name__ == "__main__":
     # Dataset setup
     dataset = datasets.load_from_disk("ger-chapter-segmentation")
     dataset = dataset.shuffle(seed=6948050)
-    dataset = dataset.train_test_split(train_size=0.001, seed=6948050)
+    dataset = dataset.train_test_split(test_size=0.2, seed=6948050)
 
-    train_ds = dataset["train"]
-    train_ds = train_ds.map(
+    dataset = dataset.map(
         lambda example: preprocess(example, tokenizer),
         batched=True,
         batch_size=BATCH_SIZE,
     )
-    train_ds = train_ds.with_format(
+    dataset = dataset.with_format(
         "torch",
         columns=["input_ids", "token_type_ids", "attention_mask", "label"],
         device=device,
     )
 
-    train_dataloader = DataLoader(train_ds, batch_size=BATCH_SIZE)
+    train_dataloader = DataLoader(dataset["train"], batch_size=BATCH_SIZE)
+    val_dataloader = DataLoader(dataset["test"], batch_size=BATCH_SIZE)
 
     # Model parameters
     param_optimizer = list(model.named_parameters())
@@ -80,6 +81,8 @@ if __name__ == "__main__":
 
     optimizer = AdamW(optimizer_grouped_parameters, lr=2e-5)
 
+    metric = evaluate.combine(["accuracy", "f1", "precision", "recall"])
+
     # Training loop
     for epoch in range(epochs):
         model.train()
@@ -93,9 +96,6 @@ if __name__ == "__main__":
             )
             batch = tuple(t.to(device) for t in batch)
             b_input_ids, b_token_type_ids, b_attention_masks, b_labels = batch
-
-            # print(b_input_ids)
-            # break
 
             optimizer.zero_grad()
 
@@ -125,19 +125,39 @@ if __name__ == "__main__":
         eval_loss, eval_accuracy = 0, 0
         nb_eval_steps, nb_eval_examples = 0, 0
 
-        # for batch in validation_dataloader:
-        #     batch = tuple(t.to(device) for t in batch)
-        #     b_input_ids, b_seg_ids, b_attention_masks, b_labels = batch
-        #     with torch.no_grad():
-        #         outputs = model(b_input_ids, token_type_ids=b_seg_ids, attention_mask=b_attention_masks)
+        for batch in val_dataloader:
+            batch = (
+                batch["input_ids"],
+                batch["token_type_ids"],
+                batch["attention_mask"],
+                batch["label"],
+            )
+            batch = tuple(t.to(device) for t in batch)
+            b_input_ids, b_token_type_ids, b_attention_masks, b_labels = batch
+            with torch.no_grad():
+                outputs = model(
+                    b_input_ids,
+                    token_type_ids=b_token_type_ids,
+                    attention_mask=b_attention_masks,
+                )
 
-        #     logits = outputs[0]
+            logits = outputs[0]
 
-        #     logits = logits.detach().cpu().numpy()
-        #     label_ids = b_labels.to('cpu').numpy()
+            metric.add_batch(
+                predictions=torch.argmax(logits, dim=1), references=b_labels
+            )
+            logits = logits.detach().cpu().numpy()
+            label_ids = b_labels.to("cpu").numpy()
 
-        #     tmp_eval_accuracy = flat_accuracy(logits, label_ids)
-        #     eval_accuracy += tmp_eval_accuracy
-        #     nb_eval_steps += 1
+            tmp_eval_accuracy = flat_accuracy(logits, label_ids)
+            eval_accuracy += tmp_eval_accuracy
+            nb_eval_steps += 1
 
         print("  Accuracy: {0:.2f}".format(eval_accuracy / nb_eval_steps))
+
+    result = metric.compute()
+    hyperparams = {"model": "deepset/gbert-base"}
+    evaluate.save("./results/", **result, **hyperparams)
+
+    # Save model
+    model.save_pretrained("./pt_save_pretrained")
