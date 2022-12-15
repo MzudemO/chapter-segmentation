@@ -4,6 +4,7 @@ from torch.optim import AdamW
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 from transformers import BertForNextSentencePrediction, BertTokenizer
+import transformers
 import evaluate
 
 from utils import flat_accuracy
@@ -30,32 +31,62 @@ def preprocess(example, tokenizer):
 
 if __name__ == "__main__":
     BATCH_SIZE = 32
+    transformers.logging.set_verbosity_error() # prevents log spam from false positive warning
 
     # Model and device setup
-    device = torch.device("cpu")
+    print(
+        f"Devices available: {torch.cuda.device_count()}. Device 0: {torch.cuda.get_device_name(0)}."
+    )
+    device = torch.device("cuda")
     tokenizer = BertTokenizer.from_pretrained("deepset/gbert-base")
 
-    model = BertForNextSentencePrediction.from_pretrained("deepset/gbert-base")
+    model = BertForNextSentencePrediction.from_pretrained(
+        "deepset/gbert-base", cache_dir="/raid/6lahann/.cache/huggingface/transformers"
+    )
     model = model.to(device)
 
     # Dataset setup
-    dataset = datasets.load_from_disk("ger-chapter-segmentation")
+    auth_token = input("Enter auth token: ").strip()
+    dataset = datasets.load_dataset(
+        "MzudemO/ger-chapter-segmentation",
+        data_files={"train": "train.csv"},
+        split="train",
+        use_auth_token=auth_token,
+        cache_dir="/raid/6lahann/.cache/huggingface/datasets",
+    )
     dataset = dataset.shuffle(seed=6948050)
     dataset = dataset.train_test_split(test_size=0.2, seed=6948050)
 
-    dataset = dataset.map(
+    train_ds = dataset["train"]
+    train_ds = train_ds.map(
         lambda example: preprocess(example, tokenizer),
         batched=True,
         batch_size=BATCH_SIZE,
+        new_fingerprint="train_2022-12-15 18_12"
     )
-    dataset = dataset.with_format(
+    train_ds = train_ds.with_format(
         "torch",
         columns=["input_ids", "token_type_ids", "attention_mask", "label"],
         device=device,
     )
 
-    train_dataloader = DataLoader(dataset["train"], batch_size=BATCH_SIZE)
-    val_dataloader = DataLoader(dataset["test"], batch_size=BATCH_SIZE)
+    val_ds = dataset["test"]
+    val_ds = val_ds.map(
+        lambda example: preprocess(example, tokenizer),
+        batched=True,
+        batch_size=BATCH_SIZE,
+        new_fingerprint="val_2022-12-15 20_48"
+    )
+    val_ds = val_ds.with_format(
+        "torch",
+        columns=["input_ids", "token_type_ids", "attention_mask", "label"],
+        device=device,
+    )
+
+    BATCH_SIZE = 8
+
+    train_dataloader = DataLoader(train_ds, batch_size=BATCH_SIZE)
+    val_dataloader = DataLoader(val_ds, batch_size=BATCH_SIZE)
 
     # Model parameters
     param_optimizer = list(model.named_parameters())
