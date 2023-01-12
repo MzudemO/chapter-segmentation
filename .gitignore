@@ -3,5 +3,6 @@ corpus*/
 __pycache__/
 *.pkl
 *.pt
+*.csv
 ger-chapter-segmentation/
 .DS_STORE
