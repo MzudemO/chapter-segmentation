@@ -49,11 +49,12 @@ if __name__ == "__main__":
     auth_token = input("Enter auth token: ").strip()
     dataset = datasets.load_dataset(
         "MzudemO/ger-chapter-segmentation",
-        data_files={"train": "train.csv"},
-        split="train",
+        data_files={"train_balanced": "train_balanced.csv"},
+        split="train_balanced",
         use_auth_token=auth_token,
         cache_dir="/raid/6lahann/.cache/huggingface/datasets",
     )
+    print(f"No. of examples: {len(dataset)}")
     dataset = dataset.shuffle(seed=6948050)
     dataset = dataset.train_test_split(test_size=0.2, seed=6948050)
 
@@ -62,7 +63,7 @@ if __name__ == "__main__":
         lambda example: preprocess(example, tokenizer),
         batched=True,
         batch_size=BATCH_SIZE,
-        new_fingerprint="train_2022-12-15 18_12"
+        new_fingerprint="train_balanced_2023-01-12 16_22"
     )
     train_ds = train_ds.with_format(
         "torch",
@@ -75,7 +76,7 @@ if __name__ == "__main__":
         lambda example: preprocess(example, tokenizer),
         batched=True,
         batch_size=BATCH_SIZE,
-        new_fingerprint="val_2022-12-15 20_48"
+        new_fingerprint="2023-01-12 16_22"
     )
     val_ds = val_ds.with_format(
         "torch",
@@ -106,7 +107,7 @@ if __name__ == "__main__":
         },
     ]
 
-    epochs = 1
+    epochs = 4
     loss_values = []
     total_loss = 0
 
@@ -191,4 +192,4 @@ if __name__ == "__main__":
     evaluate.save("./results/", **result, **hyperparams)
 
     # Save model
-    model.save_pretrained("./pt_save_pretrained")
+    model.save_pretrained("./pt_save_pretrained-balanced-e4")

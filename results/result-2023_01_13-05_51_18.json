@@ -1,0 +1,12 @@
+{
+    "accuracy": 0.579529119658492,
+    "f1": 0.4750588011365953,
+    "precision": 0.634179099059857,
+    "recall": 0.3797713242326754,
+    "model": "deepset/gbert-base-pretrained-balanced-e4",
+    "_timestamp": "2023-01-13T05:51:18.693607",
+    "_git_commit_hash": "afd2edab5fdc08a229d46c0c9d259759eb7e33ed",
+    "_evaluate_version": "0.3.0",
+    "_python_version": "3.8.13 (default, Oct 21 2022, 23:50:54) \n[GCC 11.2.0]",
+    "_interpreter_path": "/raid/6lahann/miniconda3/envs/msc-thesis/bin/python"
+}

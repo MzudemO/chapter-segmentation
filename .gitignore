@@ -6,3 +6,4 @@ __pycache__/
 *.csv
 ger-chapter-segmentation/
 .DS_STORE
+pt_save*/

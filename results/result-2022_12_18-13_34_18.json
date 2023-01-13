@@ -1,0 +1,12 @@
+{
+    "accuracy": 0.9862363567036843,
+    "f1": 0.993070490704763,
+    "precision": 0.9862363567036843,
+    "recall": 1.0,
+    "model": "deepset/gbert-base-pretrained-e1",
+    "_timestamp": "2022-12-18T13:34:18.651325",
+    "_git_commit_hash": "afd2edab5fdc08a229d46c0c9d259759eb7e33ed",
+    "_evaluate_version": "0.3.0",
+    "_python_version": "3.8.13 (default, Oct 21 2022, 23:50:54) \n[GCC 11.2.0]",
+    "_interpreter_path": "/raid/6lahann/miniconda3/envs/msc-thesis/bin/python"
+}
