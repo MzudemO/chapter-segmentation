@@ -63,6 +63,7 @@ def parse_single_book(work_dict, titlepage_info=False):
         # skip dedication chapters
         if page_path.endswith("dedication.html"):
             continue
+
         if titlepage_info:
             titlepage_info_dict = {
                 "page_idx": page_idx,
@@ -86,53 +87,54 @@ def parse_single_book(work_dict, titlepage_info=False):
             paragraphs = [
                 p.strip() for p in paragraphs if not p.isspace() and not p == ""
             ]
-            if chapter_idx == 0:
-                chapter_dict = {
-                    "name": None,
-                    "idx": chapter_idx,
-                    "paragraphs": paragraphs,
-                }
-                chapters.append(chapter_dict)
-                chapter_idx += 1
-                continue
-            else:
-                # concatenate to previous chapter
-                # dont increment chapter idx
-                chapters[chapter_idx - 1]["paragraphs"] = (
-                    chapters[chapter_idx - 1]["paragraphs"] + paragraphs
-                )
-                continue
-        for ch in chapter_headlines:
-            chapter_dict = {"name": ch.text, "idx": chapter_idx}
-            paragraphs = []
-            # iterate through consecutive p-tags
-            el = ch.find_next_sibling(True)
-            while el != None and el.name == "p":
-                paragraphs.append(tag_to_text(el))
-                el = el.find_next_sibling(True)
-
-            # element is not P tag
-            # for troubleshooting/finding edge cases:
-            if el != None:
-                current_el = el
-                next_sibling = el.find_next_sibling(True)
-                if (
-                    not is_headline_before_text(current_el)
-                    and next_sibling != None
-                    and next_sibling.name == "p"
-                ):
-                    print(
-                        f"SPACER FOUND: {current_el} -> {next_sibling}. Path: {page_path}",
-                        file=printf,
+            if len(paragraphs) > 0:
+                if chapter_idx == 0:
+                    chapter_dict = {
+                        "name": None,
+                        "idx": chapter_idx,
+                        "paragraphs": paragraphs,
+                    }
+                    chapters.append(chapter_dict)
+                    chapter_idx += 1
+                else:
+                    # concatenate to previous chapter
+                    # dont increment chapter idx
+                    chapters[chapter_idx - 1]["paragraphs"] = (
+                        chapters[chapter_idx - 1]["paragraphs"] + paragraphs
                     )
+        else:
+            for ch in chapter_headlines:
+                chapter_dict = {"name": ch.text, "idx": chapter_idx}
+                paragraphs = []
+                # iterate through consecutive p-tags
+                el = ch.find_next_sibling(True)
+                while el != None and el.name == "p":
+                    paragraphs.append(tag_to_text(el))
+                    el = el.find_next_sibling(True)
 
-            # filter empty paragraphs
-            paragraphs = [
-                p.strip() for p in paragraphs if not p.isspace() and not p == ""
-            ]
-            chapter_dict["paragraphs"] = paragraphs
-            chapters.append(chapter_dict)
-            chapter_idx += 1
+                # element is not P tag
+                # for troubleshooting/finding edge cases:
+                if el != None:
+                    current_el = el
+                    next_sibling = el.find_next_sibling(True)
+                    if (
+                        not is_headline_before_text(current_el)
+                        and next_sibling != None
+                        and next_sibling.name == "p"
+                    ):
+                        print(
+                            f"SPACER FOUND: {current_el} -> {next_sibling}. Path: {page_path}",
+                            file=printf,
+                        )
+
+                # filter empty paragraphs
+                paragraphs = [
+                    p.strip() for p in paragraphs if not p.isspace() and not p == ""
+                ]
+                if len(paragraphs) > 0:
+                    chapter_dict["paragraphs"] = paragraphs
+                    chapters.append(chapter_dict)
+                    chapter_idx += 1
 
     work_dict["chapters"] = chapters
     printf.close()
@@ -227,12 +229,13 @@ if __name__ == "__main__":
         for work in tqdm(work_dicts):
             try:
                 parse_single_book(work, titlepage_info=args.titlepage_info)
-                with open(
-                    f'corpus/{filename_from_path(work["filepath"])}',
-                    "w",
-                    encoding="utf-8",
-                ) as f:
-                    json.dump(work, f, ensure_ascii=False)
+                if len(work["chapters"]) > 1:
+                    with open(
+                        f'corpus/{filename_from_path(work["filepath"])}',
+                        "w",
+                        encoding="utf-8",
+                    ) as f:
+                        json.dump(work, f, ensure_ascii=False)
             except UnicodeDecodeError:
                 print("DECODE ERROR: ", work["filepath"])
             except FileNotFoundError:
