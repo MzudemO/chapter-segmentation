@@ -1,3 +1,4 @@
+import json
 import numpy as np
 from typing import List
 
@@ -71,3 +72,8 @@ def flat_accuracy(preds, labels):
     pred_flat = np.argmax(preds, axis=1).flatten()
     labels_flat = labels.flatten()
     return np.sum(pred_flat == labels_flat) / len(labels_flat)
+
+
+def is_novel(path: str) -> bool:
+    with open(f"corpus/{path}", "r", encoding="utf8") as f:
+        return "Erzählende Literatur" in json.load(f)["genres"]

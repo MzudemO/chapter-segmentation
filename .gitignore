@@ -7,3 +7,4 @@ __pycache__/
 ger-chapter-segmentation/
 .DS_STORE
 pt_save*/
+eval-dataset/
