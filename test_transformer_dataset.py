@@ -41,7 +41,7 @@ if __name__ == "__main__":
     tokenizer = BertTokenizer.from_pretrained("deepset/gbert-base")
 
     model = BertForNextSentencePrediction.from_pretrained(
-        "./pt_save_pretrained-balanced-e1", 
+        "./pt_save_pretrained-balanced-e4", 
         # cache_dir="/raid/6lahann/.cache/huggingface/transformers"
     )
     model = model.to(device)
@@ -62,7 +62,7 @@ if __name__ == "__main__":
         lambda example: preprocess(example, tokenizer),
         batched=True,
         batch_size=BATCH_SIZE,
-        new_fingerprint="test_2023-01-13 13_18"
+        new_fingerprint="test_2023-01-13 14_49"
     )
     test_ds = test_ds.with_format(
         "torch",
@@ -83,7 +83,7 @@ if __name__ == "__main__":
     eval_loss, eval_accuracy = 0, 0
     nb_eval_steps, nb_eval_examples = 0, 0
 
-    for batch in test_dataloader:
+    for batch in tqdm(test_dataloader):
         batch = (
             batch["input_ids"],
             batch["token_type_ids"],
@@ -104,15 +104,16 @@ if __name__ == "__main__":
         metric.add_batch(
             predictions=torch.argmax(logits, dim=1), references=b_labels
         )
-        logits = logits.detach().cpu().numpy()
-        label_ids = b_labels.to("cpu").numpy()
+        # logits = logits.detach().cpu().numpy()
+        # label_ids = b_labels.to("cpu").numpy()
 
-        tmp_eval_accuracy = flat_accuracy(logits, label_ids)
-        eval_accuracy += tmp_eval_accuracy
-        nb_eval_steps += 1
+        # tmp_eval_accuracy = flat_accuracy(logits, label_ids)
+        # eval_accuracy += tmp_eval_accuracy
+        # nb_eval_steps += 1
 
-    print("  Accuracy: {0:.2f}".format(eval_accuracy / nb_eval_steps))
-
+    # print("  Accuracy: {0:.2f}".format(eval_accuracy / nb_eval_steps))
+    print("Finished. Computing metrics.")
+    
     result = metric.compute()
-    hyperparams = {"model": "deepset/gbert-base-pretrained-balanced-e1"}
+    hyperparams = {"model": "deepset/gbert-base-pretrained-balanced-e4"}
     evaluate.save("./results/", **result, **hyperparams)

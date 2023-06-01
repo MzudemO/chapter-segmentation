@@ -4,6 +4,7 @@ from torch.utils.data import DataLoader
 import pandas as pd
 from tqdm import tqdm
 from transformers import BertForNextSentencePrediction, BertTokenizer
+import transformers
 
 from utils import flat_accuracy
 
@@ -26,27 +27,47 @@ def preprocess(example, tokenizer):
     output["chapter"] = example["chapter"]
     output["paragraph"] = example["paragraph"]
     labels = example["is_continuation"]
-    output["label"] = torch.tensor(labels, dtype=torch.long)
+    output["label"] = example["label"]
     return output
 
 
 if __name__ == "__main__":
     results = []
-    BATCH_SIZE = 32
+    BATCH_SIZE = 8
+    transformers.logging.set_verbosity_error() # prevents log spam from false positive warning
+    torch.set_num_threads(1) # try to prevent 100% cpu usage
 
     # Model and device setup
-    device = torch.device("cpu")
+    print(
+        f"Devices available: {torch.cuda.device_count()}. Device 0: {torch.cuda.get_device_name(0)}."
+    )
+    auth_token = input("Enter auth token: ").strip()
+    device = torch.device("cuda")
     tokenizer = BertTokenizer.from_pretrained("deepset/gbert-base")
 
-    model = BertForNextSentencePrediction.from_pretrained("./finetuned-balanced-e1")
+    model = BertForNextSentencePrediction.from_pretrained(
+        "MzudemO/chapter-segmentation-model", 
+        revision="752630c190621d1cf28350bb83dff2f0d7749344", 
+        use_auth_token=auth_token, 
+        cache_dir="/raid/6lahann/.cache/huggingface/transformers"
+    )
+
     model = model.to(device)
 
     # Dataset setup
-    dataset = datasets.load_from_disk("eval-dataset")
+    dataset = datasets.load_dataset(
+        "MzudemO/ger-chapter-segmentation",
+        data_files={"dataset": "test_for_eval.csv"},
+        split="dataset",
+        use_auth_token=auth_token,
+        cache_dir="/raid/6lahann/.cache/huggingface/datasets",
+    )
+
     dataset = dataset.map(
         lambda example: preprocess(example, tokenizer),
         batched=True,
         batch_size=BATCH_SIZE,
+        new_fingerprint="test_2023-05-26 01_40"
     )
     dataset = dataset.with_format(
         "torch",
@@ -62,8 +83,7 @@ if __name__ == "__main__":
         device=device,
     )
 
-    BATCH_SIZE = 1
-    dataloader = DataLoader(dataset, batch_size=BATCH_SIZE)
+    dataloader = DataLoader(dataset, batch_size=BATCH_SIZE, pin_memory=False, num_workers=0)
 
     model.eval()
 
@@ -86,17 +106,18 @@ if __name__ == "__main__":
         logits = outputs[0]
 
         logits = logits.detach().cpu().numpy()
-
-        results.append(
-            [
-                batch["book"][0],
-                batch["chapter"].numpy()[0],
-                batch["paragraph"].numpy()[0],
-                batch["label"].numpy()[0],
-                logits[0][0],
-                logits[0][1],
-            ]
-        )
+        
+        for index, logit in enumerate(logits): 
+            results.append(
+                [
+                    batch["book"][index],
+                    batch["chapter"][index].cpu().item(),
+                    batch["paragraph"][index].cpu().item(),
+                    batch["label"][index].cpu().item(),
+                    logit[0],
+                    logit[1],
+                ]
+            )
 
     df = pd.DataFrame(results)
     df = df.rename(
@@ -109,4 +130,4 @@ if __name__ == "__main__":
             5: "logit_1",
         }
     )
-    df.to_pickle("results_finetuned-balanced-e1.pkl")
+    df.to_pickle("./results/results_finetuned-full.pkl")
