@@ -31,7 +31,7 @@ books_df = pd.json_normalize(all_books)
 pd.Series(np.concatenate(books_df["genres"])).value_counts()[:20].plot(
     kind="barh", title="20 Most Frequent Genres"
 )
-plt.savefig("figures/genre_frequencies.png", bbox_inches="tight")
+plt.savefig("figures/genre_frequencies.svg", bbox_inches="tight")
 
 # Count books with genres we don't want
 genre_df = books_df.explode(column="genres")

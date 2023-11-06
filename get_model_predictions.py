@@ -6,8 +6,6 @@ from tqdm import tqdm
 from transformers import BertForNextSentencePrediction, BertTokenizer
 import transformers
 
-from utils import flat_accuracy
-
 
 def preprocess(example, tokenizer):
     sequences = zip(example["p1_tokens"], example["p2_tokens"])

@@ -5,9 +5,23 @@ import json
 from bs4 import BeautifulSoup
 import time
 from tqdm import tqdm
+import glob
+from utils import filename_from_path
 
-# wget -c --random-wait -r -p --regex-type pcre --accept-regex 'gutenberg.org/[0-9\-a-z]+/([0-9\-a-z]+)/(.*).html$' -U mozilla
+# get downloaded works (differentiate by path)
+books = glob.glob("corpus/*.json")
 
+downloaded_paths = []
+
+for book_path in tqdm(books):
+    book = {}
+    with open(book_path, "r", encoding="utf8") as f:
+        book = json.load(f)
+
+    downloaded_paths.append(book["path"])
+
+
+# get all new works
 root_path = "https://www.projekt-gutenberg.org/info/texte/allworka.html"
 
 r = requests.get(root_path)
@@ -22,22 +36,22 @@ for work in all_works_html:
     link = work.findChild("a")
     if link:
         path = link["href"]
-        # correct broken url
-        path = (
-            path if path.startswith("..") else "../../antholog/scheusal/scheusal.html"
-        )
-        title = re.sub(r"\s+", " ", link.text)
-        genres = work.findChild("i")
-        genres = [] if genres == None else genres.text.split(",")
-        genres = [s.strip() for s in genres]
-        genres = [re.sub(r"\s+", " ", g) for g in genres]
-
         abspath = urllib.parse.urljoin(root_path, path)
 
-        all_works.append(
-            {"path": abspath, "title": title, "genres": genres, "chapters": []}
-        )
+        if abspath not in downloaded_paths:
+            print(abspath)
 
+            title = re.sub(r"\s+", " ", link.text)
+            genres = work.findChild("i")
+            genres = [] if genres == None else genres.text.split(",")
+            genres = [s.strip() for s in genres]
+            genres = [re.sub(r"\s+", " ", g) for g in genres]
+
+            all_works.append(
+                {"path": abspath, "title": title, "genres": genres, "chapters": []}
+            )
+
+# download all new works
 for work_index, work in enumerate(tqdm(all_works)):
     try:
         html = requests.get(work["path"], timeout=10).content
@@ -73,7 +87,9 @@ for work_index, work in enumerate(tqdm(all_works)):
     work_dict = work.copy()
     work_dict["chapters"] = work_chapters
 
-    with open(f"corpus/{work_index}.json", "w", encoding="utf8") as f:
+    with open(
+        f"corpus/{filename_from_path(work_dict['path'])}", "w", encoding="utf8"
+    ) as f:
         json.dump(work_dict, f, ensure_ascii=False)
 
     # rate limit
