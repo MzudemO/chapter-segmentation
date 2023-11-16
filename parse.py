@@ -2,12 +2,36 @@ import requests
 import re
 import urllib
 import json
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, NavigableString, Tag
 import time
 from tqdm import tqdm
 import glob
 from utils import filename_from_path
 import os
+import copy
+
+
+def is_headline_before_text(tag: Tag) -> bool:
+    return tag.name in ["h3", "h4"] and tag.find_next_sibling(True).name == "p"
+
+
+### testing
+with open(
+    "/mnt/c/Users/Moritz Lahann/Desktop/STUDIUM/Module IAS/Master's Thesis/gutenberg-edition16/betsch/freiger/chap001.html",
+    "r",
+    encoding="utf8",
+) as f:
+    soup = BeautifulSoup(f, features="lxml")
+headline = soup.find(is_headline_before_text)
+print(headline)
+print(headline.find_next_sibling(True))
+el = headline.find_next_sibling(True)
+while el.name == "p":
+    print(el.text)
+    el = el.find_next_sibling(True)  # this might not satisfy our condition
+print(soup.find_all(is_headline_before_text))
+
+input("")
 
 
 # "lastname, firstname" -> "firstname lastname"
@@ -56,7 +80,7 @@ for genre in genres:
             book_path = os.path.normpath(
                 os.path.join(os.path.dirname(root_path), relative_path)
             )
-            with open(book_path, "r", encoding="ISO-8859-1") as f:
+            with open(book_path, "r", encoding="utf8") as f:
                 work_html = BeautifulSoup(f, features="lxml")
 
             pages = work_html.find(class_="dropdown-content")
@@ -71,7 +95,7 @@ for genre in genres:
                 page_path = os.path.normpath(
                     os.path.join(os.path.dirname(book_path), page_path)
                 )
-                with open(page_path, "r", encoding="ISO-8859-1") as f:
+                with open(page_path, "r", encoding="utf8") as f:
                     page_html = BeautifulSoup(f, features="lxml")
 
                 # find h3 or h4 (or others?) where next sibling is <p>
