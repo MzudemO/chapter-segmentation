@@ -11,27 +11,101 @@ import os
 import copy
 
 
+def p_tag_to_text(tag: Tag) -> str:
+    pagerefs = tag.find_all("a", class_="pageref")
+    [pr.decompose() for pr in pagerefs]
+    return re.sub(r"\s+", " ", tag.text)
+
+
 def is_headline_before_text(tag: Tag) -> bool:
-    return tag.name in ["h3", "h4"] and tag.find_next_sibling(True).name == "p"
+    return tag.name in ["h2", "h3", "h4"] and tag.find_next_sibling(True).name == "p"
+
+
+def parse_single_book(work_dict):
+    book_path = work_dict["filepath"]
+    with open(book_path, "r", encoding="utf-8") as f:
+        work_html = BeautifulSoup(f, features="lxml")
+
+    # not present in all?
+    pages = work_html.find(class_="dropdown-content")
+    pages = [] if pages == None else pages.findChildren("li")
+    pages = [ch.a["href"] for ch in pages]
+    pages = [book_path] if len(pages) == 0 else pages
+
+    chapter_idx = 0
+    chapters = []
+
+    for page in pages:
+        page_path = os.path.normpath(os.path.join(os.path.dirname(book_path), page))
+        with open(page_path, "r", encoding="utf-8") as f:
+            page_html = BeautifulSoup(f, features="lxml")
+
+        chapter_headlines = page_html.find_all(is_headline_before_text)
+        for ch in chapter_headlines:
+            chapter_dict = {"name": ch.text, "idx": chapter_idx}
+            paragraphs = []
+            # iterate through consecutive p-tags
+            el = ch.find_next_sibling(True)
+            while el != None and el.name in ["p", "hr", "div"]:
+                class_ = el.get("class")
+                class_ = [] if class_ == None else class_
+                # TODO: div class "toc" is indicator of titlepage chapter
+                # allow for image spacer (e.g. Robert Kraft - Die Vestalinnen, Band 1)
+                if el.name == "div" and "figure" in class_:
+                    el = el.find_next_sibling(True)
+                    continue
+                # allow for single hr spacer (e.g. Hugo Salus - Der Spiegel)
+                if el.name == "hr":
+                    el = el.find_next_sibling(True)
+                    continue
+                # ignore *** spacer (e.g. Seestern - 1906)
+                if el.name == "p" and "stars" in class_:
+                    el = el.find_next_sibling(True)
+                    continue
+                # TODO: check if <br/> pose an issue
+                if el.name == "p":
+                    paragraphs.append(p_tag_to_text(el))
+                    el = el.find_next_sibling(True)
+
+            # element is not P tag
+            # for troubleshooting/finding edge cases:
+            if el != None:
+                current_el = el
+                next_sibling = el.find_next_sibling(True)
+                if (
+                    not is_headline_before_text(current_el)
+                    and next_sibling != None
+                    and next_sibling.name == "p"
+                ):
+                    print(
+                        f"SPACER FOUND: {current_el} -> {next_sibling}. Path: {page_path}"
+                    )
+
+            # filter empty paragraphs
+            paragraphs = [p for p in paragraphs if not p.isspace() and not p == ""]
+            chapter_dict["paragraphs"] = paragraphs
+            chapters.append(chapter_dict)
+            chapter_idx += 1
+
+    work_dict["chapters"] = chapters
 
 
 ### testing
-with open(
-    "/mnt/c/Users/Moritz Lahann/Desktop/STUDIUM/Module IAS/Master's Thesis/gutenberg-edition16/betsch/freiger/chap001.html",
-    "r",
-    encoding="utf8",
-) as f:
-    soup = BeautifulSoup(f, features="lxml")
-headline = soup.find(is_headline_before_text)
-print(headline)
-print(headline.find_next_sibling(True))
-el = headline.find_next_sibling(True)
-while el.name == "p":
-    print(el.text)
-    el = el.find_next_sibling(True)  # this might not satisfy our condition
-print(soup.find_all(is_headline_before_text))
+# work_dict = {
+#     "author": "Test Author",
+#     "title": "Test Title",
+#     "genre": "Test Genre",
+#     "path": "Test Path",
+# }
 
-input("")
+# parse_single_book(
+#     work_dict,
+#     "/mnt/c/Users/Moritz Lahann/Desktop/STUDIUM/Module IAS/Master's Thesis/gutenberg-edition16/dauthend/novellen/titlepage.html",
+# )
+
+# with open("test_single_book_parse.json", "w", encoding="utf-8") as f:
+#     json.dump(work_dict, f, ensure_ascii=False)
+# input("")
 
 
 # "lastname, firstname" -> "firstname lastname"
@@ -47,11 +121,24 @@ root_path = "/mnt/c/Users/Moritz Lahann/Desktop/STUDIUM/Module IAS/Master's Thes
 with open(root_path, "r", encoding="ISO-8859-1") as f:
     soup = BeautifulSoup(f, features="lxml")
 
-genres = ["Über Literatur"]
+genres = [
+    "Romane, Novellen und Erzählungen",
+    "Historische Romane und Erzählungen",
+    "Spannung und Abenteuer",
+    "Krimis, Thriller, Spionage",
+    "Historische Kriminalromane und -fälle",
+    "Science Fiction",
+    "Phantastische Literatur",
+    "Horror",
+    "Humor, Satire",
+    "Kinderbücher bis 11 Jahre",
+    "Kinderbücher ab 12 Jahren",
+]
 
 fiction_genre_list = soup.find("p", string="Belletristik").find_next_sibling("dl")
 
 for genre in genres:
+    work_dicts = []
     link = fiction_genre_list.find("a", text=genre)
     if link == None:
         continue
@@ -71,100 +158,23 @@ for genre in genres:
                 "author": author,
                 "title": title,
                 "genre": genre,
-                "path": urllib.parse.urljoin(
+                "webpath": urllib.parse.urljoin(
                     "https://www.projekt-gutenberg.org/info/texte/allworka.html",
                     relative_path,
                 ),
+                "filepath": os.path.normpath(
+                    os.path.join(os.path.dirname(root_path), relative_path)
+                ),
             }
-            print(work_dict)
-            book_path = os.path.normpath(
-                os.path.join(os.path.dirname(root_path), relative_path)
-            )
-            with open(book_path, "r", encoding="utf8") as f:
-                work_html = BeautifulSoup(f, features="lxml")
-
-            pages = work_html.find(class_="dropdown-content")
-            pages = [] if pages == None else pages.findChildren("li")
-            pages = [ch.a for ch in pages]
-
-            chapter_idx = 0
-            chapters = []
-
-            for page in pages:
-                page_path = page["href"]
-                page_path = os.path.normpath(
-                    os.path.join(os.path.dirname(book_path), page_path)
-                )
-                with open(page_path, "r", encoding="utf8") as f:
-                    page_html = BeautifulSoup(f, features="lxml")
-
-                # find h3 or h4 (or others?) where next sibling is <p>
-                # should we split anthologies into multiple books?
-                # h3 -> book, h4 -> chapter? (if not anthology, h3 -> chapter)
+            work_dicts.append(work_dict)
 
             # continue loop
             current = current.find_next_sibling("dt")
 
-
-# for work in all_works_html:
-#     link = work.findChild("a")
-#     if link:
-#         path = link["href"]
-#         abspath = urllib.parse.urljoin(root_path, path)
-
-#         if abspath not in downloaded_paths:
-#             print(abspath)
-
-#             title = re.sub(r"\s+", " ", link.text)
-#             genres = work.findChild("i")
-#             genres = [] if genres == None else genres.text.split(",")
-#             genres = [s.strip() for s in genres]
-#             genres = [re.sub(r"\s+", " ", g) for g in genres]
-
-#             all_works.append(
-#                 {"path": abspath, "title": title, "genres": genres, "chapters": []}
-#             )
-
-# # download all new works
-# for work_index, work in enumerate(tqdm(all_works)):
-#     try:
-#         html = requests.get(work["path"], timeout=10).content
-#     except:
-#         print(work, work_index)
-#         continue
-#     work_html = BeautifulSoup(html, features="lxml")
-
-#     chapters = work_html.find(class_="dropdown-content")
-#     chapters = [] if chapters == None else chapters.findChildren("li")
-#     chapters = [ch.a for ch in chapters]
-#     work_chapters = []
-
-#     for idx, chapter in enumerate(chapters):
-#         chapter_path = chapter["href"]
-#         name = chapter.text
-#         index = idx
-#         abspath = urllib.parse.urljoin(work["path"], chapter_path)
-
-#         try:
-#             html = requests.get(abspath, timeout=10).content
-#         except:
-#             print(work, work_index)
-#             break
-#         chapter_html = BeautifulSoup(html, features="lxml")
-#         paragraphs = chapter_html.find_all(name="p")
-#         paragraphs = [p.text for p in paragraphs]
-#         paragraphs = [re.sub(r"\s+", " ", p) for p in paragraphs]
-#         paragraphs = [p for p in paragraphs if not p.isspace() and not p == ""]
-
-#         work_chapters.append({"name": name, "index": index, "paragraphs": paragraphs})
-
-#     work_dict = work.copy()
-#     work_dict["chapters"] = work_chapters
-
-#     with open(
-#         f"corpus/{filename_from_path(work_dict['path'])}", "w", encoding="utf8"
-#     ) as f:
-#         json.dump(work_dict, f, ensure_ascii=False)
-
-#     # rate limit
-#     time.sleep(1)
+    print(len(work_dicts))
+    for work in tqdm(work_dicts):
+        parse_single_book(work_dict)
+        with open(
+            f'corpus/{filename_from_path(work_dict["filepath"])}', "w", encoding="utf-8"
+        ) as f:
+            json.dump(work_dict, f, ensure_ascii=False)
