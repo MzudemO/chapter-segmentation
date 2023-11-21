@@ -26,12 +26,11 @@ def parse_single_book(work_dict):
     with open(book_path, "r", encoding="utf-8") as f:
         work_html = BeautifulSoup(f, features="lxml")
 
-    # not present in all?
     pages = work_html.find(class_="dropdown-content")
     pages = [] if pages == None else pages.findChildren("li")
     pages = [ch.a["href"] for ch in pages]
+    # allow for single-page no dropdown works (e.g. Hugo Salus - Der Spiegel)
     pages = [book_path] if len(pages) == 0 else pages
-
     chapter_idx = 0
     chapters = []
 
@@ -41,12 +40,22 @@ def parse_single_book(work_dict):
             page_html = BeautifulSoup(f, features="lxml")
 
         chapter_headlines = page_html.find_all(is_headline_before_text)
+        # random sample tests show we can assume non-titled chapters to be new chapters
+        if len(chapter_headlines) == 0:
+            chapter_dict = {"name": None, "idx": chapter_idx}
+            paragraphs = page_html.find_all("p")
+            paragraphs = [p_tag_to_text(p) for p in paragraphs]
+            paragraphs = [p for p in paragraphs if not p.isspace() and not p == ""]
+            chapter_dict["paragraphs"] = paragraphs
+            chapters.append(chapter_dict)
+            chapter_idx += 1
+            print(f'No-headline chapter: {work_dict["filepath"]}')
         for ch in chapter_headlines:
             chapter_dict = {"name": ch.text, "idx": chapter_idx}
             paragraphs = []
             # iterate through consecutive p-tags
             el = ch.find_next_sibling(True)
-            while el != None and el.name in ["p", "hr", "div"]:
+            while el != None and el.name in ["p", "hr", "div", "table"]:
                 class_ = el.get("class")
                 class_ = [] if class_ == None else class_
                 # TODO: div class "toc" is indicator of titlepage chapter
@@ -55,17 +64,23 @@ def parse_single_book(work_dict):
                     el = el.find_next_sibling(True)
                     continue
                 # allow for single hr spacer (e.g. Hugo Salus - Der Spiegel)
-                if el.name == "hr":
+                elif el.name == "hr":
                     el = el.find_next_sibling(True)
                     continue
                 # ignore *** spacer (e.g. Seestern - 1906)
-                if el.name == "p" and "stars" in class_:
+                elif el.name == "p" and "stars" in class_:
+                    el = el.find_next_sibling(True)
+                    continue
+                # skip short poetry and other tables
+                elif el.name == "table":
                     el = el.find_next_sibling(True)
                     continue
                 # TODO: check if <br/> pose an issue
-                if el.name == "p":
+                elif el.name == "p":
                     paragraphs.append(p_tag_to_text(el))
                     el = el.find_next_sibling(True)
+                else:
+                    break
 
             # element is not P tag
             # for troubleshooting/finding edge cases:
@@ -90,18 +105,16 @@ def parse_single_book(work_dict):
     work_dict["chapters"] = chapters
 
 
-### testing
+# testing
 # work_dict = {
 #     "author": "Test Author",
 #     "title": "Test Title",
 #     "genre": "Test Genre",
-#     "path": "Test Path",
+#     "webpath": "Test Path",
+#     "filepath": "/mnt/c/Users/Moritz Lahann/Desktop/STUDIUM/Module IAS/Master's Thesis/gutenberg-edition16/adlersfe/maskenba/maskenba.html",
 # }
 
-# parse_single_book(
-#     work_dict,
-#     "/mnt/c/Users/Moritz Lahann/Desktop/STUDIUM/Module IAS/Master's Thesis/gutenberg-edition16/dauthend/novellen/titlepage.html",
-# )
+# parse_single_book(work_dict)
 
 # with open("test_single_book_parse.json", "w", encoding="utf-8") as f:
 #     json.dump(work_dict, f, ensure_ascii=False)
@@ -123,22 +136,13 @@ with open(root_path, "r", encoding="ISO-8859-1") as f:
 
 genres = [
     "Romane, Novellen und Erzählungen",
-    "Historische Romane und Erzählungen",
-    "Spannung und Abenteuer",
-    "Krimis, Thriller, Spionage",
-    "Historische Kriminalromane und -fälle",
-    "Science Fiction",
-    "Phantastische Literatur",
-    "Horror",
-    "Humor, Satire",
-    "Kinderbücher bis 11 Jahre",
-    "Kinderbücher ab 12 Jahren",
 ]
 
 fiction_genre_list = soup.find("p", string="Belletristik").find_next_sibling("dl")
 
+work_dicts = []
+
 for genre in genres:
-    work_dicts = []
     link = fiction_genre_list.find("a", text=genre)
     if link == None:
         continue
@@ -147,9 +151,12 @@ for genre in genres:
     current = book_list.find(["dt", "dd"])
     while current != None:
         # skip interspersed book covers
-        if current.name == "dt" and current.find("a") != None:
+        if current.name == "dt" and current.find("img") != None:
             current = current.find_next_sibling("dt")
         else:
+            # remove alphabetic marks in Romane, Novellen und Erzählungen
+            alphabetic_marks = current.find_all("b")
+            [am.decompose() for am in alphabetic_marks]
             author = normalize_author(current.text)
             book_link = current.find_next_sibling("dd").a
             title = book_link.text
@@ -171,10 +178,10 @@ for genre in genres:
             # continue loop
             current = current.find_next_sibling("dt")
 
-    print(len(work_dicts))
-    for work in tqdm(work_dicts):
-        parse_single_book(work_dict)
-        with open(
-            f'corpus/{filename_from_path(work_dict["filepath"])}', "w", encoding="utf-8"
-        ) as f:
-            json.dump(work_dict, f, ensure_ascii=False)
+print(len(work_dicts))
+for work in tqdm(work_dicts):
+    parse_single_book(work)
+    with open(
+        f'corpus/{filename_from_path(work_dict["filepath"])}', "w", encoding="utf-8"
+    ) as f:
+        json.dump(work_dict, f, ensure_ascii=False)
