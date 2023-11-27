@@ -1,14 +1,9 @@
-import requests
 import re
 import urllib
-import json
-from bs4 import BeautifulSoup, NavigableString, Tag
-import time
+from bs4 import BeautifulSoup, Tag
 from tqdm import tqdm
-import glob
 from utils import filename_from_path
 import os
-import copy
 
 
 def p_tag_to_text(tag: Tag) -> str:
@@ -18,10 +13,17 @@ def p_tag_to_text(tag: Tag) -> str:
 
 
 def is_headline_before_text(tag: Tag) -> bool:
-    return tag.name in ["h2", "h3", "h4"] and tag.find_next_sibling(True).name == "p"
+    next_sibling = tag.find_next_sibling(True)
+    if tag.name in ["h2", "h3", "h4"] and next_sibling is None:
+        print("NEXT SIBLING IS NONE", tag)
+        return False
+    else:
+        return tag.name in ["h2", "h3", "h4"] and next_sibling.name == "p"
 
 
 def parse_single_book(work_dict):
+    printf = open("parse_log.txt", "a")
+
     book_path = work_dict["filepath"]
     with open(book_path, "r", encoding="utf-8") as f:
         work_html = BeautifulSoup(f, features="lxml")
@@ -49,7 +51,8 @@ def parse_single_book(work_dict):
             chapter_dict["paragraphs"] = paragraphs
             chapters.append(chapter_dict)
             chapter_idx += 1
-            print(f'No-headline chapter: {work_dict["filepath"]}')
+            print(f"No-headline chapter: {page_path}", file=printf)
+            continue
         for ch in chapter_headlines:
             chapter_dict = {"name": ch.text, "idx": chapter_idx}
             paragraphs = []
@@ -59,23 +62,46 @@ def parse_single_book(work_dict):
                 class_ = el.get("class")
                 class_ = [] if class_ == None else class_
                 # TODO: div class "toc" is indicator of titlepage chapter
-                # allow for image spacer (e.g. Robert Kraft - Die Vestalinnen, Band 1)
-                if el.name == "div" and "figure" in class_:
+                # allow for breaks (Willibald Alexis - Ruhe ist die erste Bürgerpflicht, Alkiphron - Hetärenbriefe)
+                if el.name == "br":
                     el = el.find_next_sibling(True)
                     continue
-                # allow for single hr spacer (e.g. Hugo Salus - Der Spiegel)
+                # allow for image spacer (Robert Kraft - Die Vestalinnen, Band 1)
+                elif el.name == "div" and "figure" in class_:
+                    el = el.find_next_sibling(True)
+                    continue
+                # allow for single hr spacer (Hugo Salus - Der Spiegel)
                 elif el.name == "hr":
                     el = el.find_next_sibling(True)
                     continue
-                # ignore *** spacer (e.g. Seestern - 1906)
+                # ignore *** spacer (Seestern - 1906)
                 elif el.name == "p" and "stars" in class_:
                     el = el.find_next_sibling(True)
                     continue
-                # skip short poetry and other tables
+                # skip short poetry and other tables (Willibald Alexis - Ruhe ist die erste Bürgerpflicht, Roland Betsch - Der Wilde Freiger)
                 elif el.name == "table":
                     el = el.find_next_sibling(True)
                     continue
-                # TODO: check if <br/> pose an issue
+                # skip poetry/lyrics (Honoré de Balzac - Lebensbilder - Band 1)
+                elif el.name == "p" and "vers" in class_:
+                    el = el.find_next_sibling(True)
+                    continue
+                # skip poetry/lyrics (Ulrich Hegner - Die Molkenkur)
+                elif el.name == "div" and "poem" in class_:
+                    el = el.find_next_sibling(True)
+                    continue
+                # skip lists (Karl Adolph - Haus Nummer 37)
+                elif el.name == "ol":
+                    el = el.find_next_sibling(True)
+                    continue
+                # add letter as single paragraph (Edmond About - Die Spielhölle in Baden-Baden)
+                elif el.name == "div" and "letter" in class_:
+                    paragraphs.append(p_tag_to_text(el))
+                    el = el.find_next_sibling(True)
+                # add blockquote as single paragraph (Honoré de Balzac - Glanz und Elend der Kurtisanen)
+                elif el.name == "blockquote":
+                    paragraphs.append(p_tag_to_text(el))
+                    el = el.find_next_sibling(True)
                 elif el.name == "p":
                     paragraphs.append(p_tag_to_text(el))
                     el = el.find_next_sibling(True)
@@ -93,7 +119,8 @@ def parse_single_book(work_dict):
                     and next_sibling.name == "p"
                 ):
                     print(
-                        f"SPACER FOUND: {current_el} -> {next_sibling}. Path: {page_path}"
+                        f"SPACER FOUND: {current_el} -> {next_sibling}. Path: {page_path}",
+                        file=printf,
                     )
 
             # filter empty paragraphs
@@ -103,6 +130,7 @@ def parse_single_book(work_dict):
             chapter_idx += 1
 
     work_dict["chapters"] = chapters
+    printf.close()
 
 
 # testing
@@ -180,8 +208,11 @@ for genre in genres:
 
 print(len(work_dicts))
 for work in tqdm(work_dicts):
-    parse_single_book(work)
-    with open(
-        f'corpus/{filename_from_path(work_dict["filepath"])}', "w", encoding="utf-8"
-    ) as f:
-        json.dump(work_dict, f, ensure_ascii=False)
+    try:
+        parse_single_book(work)
+    except UnicodeDecodeError:
+        print("DECODE ERROR: ", work["filepath"])
+    # with open(
+    #     f'corpus/{filename_from_path(work_dict["filepath"])}', "w", encoding="utf-8"
+    # ) as f:
+    #     json.dump(work_dict, f, ensure_ascii=False)

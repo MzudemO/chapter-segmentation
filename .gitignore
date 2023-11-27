@@ -9,3 +9,4 @@ ger-chapter-segmentation/
 pt_save*/
 eval-dataset/
 *.zip
+parse_log.txt
