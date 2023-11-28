@@ -3,18 +3,34 @@
 * pageref (Roland Betsch - Der Wilde Freiger)
 * table (Roland Betsch - Der Wilde Freiger, Willibald Alexis - Ruhe ist die erste Bürgerpflicht)
 * no headline & first chapter could be title page? (Abraham a Sancta Clara - Verschiedenes, Karl Adolph - Von früher und heute, Alexandra, königliche Prinzessin von Bayern - Maiglöckchen)
+    - `div class="toc">`?
+    - `div class="dedication">`?
+    - "titlepage" in url?
     - check if no p tag with text at all -> safe bet
     - 1st pass: remove all empty p tags? alejchem/nahosten/chap002.html
 * headline detection: 
     - table between headline & chapter (Willibald Alexis - Walladmor)
     - `<hr class="short"/>` (Henri Allais - Die Wachsbüste und andere Erzählungen)
-* `<br clear="all"/>` (Willibald Alexis - Ruhe ist die erste Bürgerpflicht, Alkiphron - Hetärenbriefe)
+* `<br clear="all"/>` (Willibald Alexis - Ruhe ist die erste Bürgerpflicht)
 * `<h5>` (Edmondo De Amicis - Unsere Freunde, Theodor Herzl - Philosophische Erzählungen, H. Clauren - Die Versuchung)
 * `<ol>` (Karl Adolph - Haus Nummer 37, Schalom Alechem - Die erste jüdische Republik, Honoré de Balzac - Louis Lambert)
+* `<ul>` (Charles Dickens - Klein-Dorrit. Zweites Buch)
 * `<p class="vers>` (Honoré de Balzac - Lebensbilder - Band 1)
-* `<h1>` (Rudolf Herzog - Wieland der Schmied)
-* `<a id="page###" name="page###">` various
+* `<h1>` (Rudolf Herzog - Wieland der Schmied, Gustav Aimard - Mexikanische Nächte Zweiter Theil, Wilkie Collins - Blinde Liebe. Zweiter Band, Louis Couperus - Herakles, Hans Fallada - Der eiserne Gustav)
+* `<a id="page###" name="page###">` various (e.g. Edward Bulwer-Lytton - Godolphin oder der Schwur)
 * `<div class="poem">` (Ulrich Hegner - Die Molkenkur)
+* `<div class="motto">` (Scholem Alejchem - Aus dem nahen Osten)
+* `<div class="box">` (Georg Weerth - Leben und Taten des berühmten Ritters Schnapphahnski)
+* `<address>` (Adelheid von Auer - Fußstapfen im Sande. Erster Band, Edward Bulwer-Lytton - Meine Novelle. Erster Band)
+* `<div class="plakat">` (Arkadij Awertschenko - Kurzgeschichten)
+* `<h6>` (Max Bartel - Aufstieg der Begabten, Otto Blumenthal - Eine Frauenbeichte und Anderes, Jakob Boßhardt - Ein Rufer in der Wüste)
+* `<div class="vers">` (Otto Julius Bierbaum - Sinaide)
+* `<img>` (Hanns Heiz Ewers - Grotesken, Hans Fallada - Märchen vom Stadtschreiber, der aufs Land flog)
+* `<aside>` (Emanuel Friedli - Bärndütsch als Spiegel bernischen Volkstums / Vierter Band)
+* `<pre>` (Georg Weerth - Leben und Taten des berühmten Ritters Schnapphahnski, Jules Verne - Die Kinder des Kapitän Grant. Erster Band)
+* `<span class="footnote">` (Petronius - Begebenheiten des Enkolp)
+* empty or completely non-word `<p>` (Henri Allais - Die Wachsbüste und andere Erzählungen, Scholem Alejchem - Aus dem nahen Osten)
+
 
 # Keep
 
@@ -60,8 +76,10 @@
     - Paul Grabein - Nomaden (no source - narrative breaks)
     - Ravi Ravendro - Tanzende Flamme (no clearly marked chapters)
     - Christian Reuter - Schelmuffsky (chapters clearly marked > 1 page)
+    - Theodor Storm - Curator (no clearly marked chapters)
 * fucked up encoding & weird structure:
     - Hans Christian Andersen (Nur ein Geiger, Der Glücks-Peter, Der Improvisator, Oz, Sein oder Nichtsein)
-    - Restif de la Bretonne (Anti-Justine)
+    - Restif de la Bretonne - Anti-Justine
+    - Alkiphron - Hetärenbriefe
 * missing link:
     - Honoré de Balzac - Die Messe der Gottlosen
