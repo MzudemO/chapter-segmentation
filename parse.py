@@ -6,8 +6,10 @@ from utils import filename_from_path
 import os
 import json
 
+TITLEPAGE_INFO = []
 
-def p_tag_to_text(tag: Tag) -> str:
+
+def tag_to_text(tag: Tag) -> str:
     pagerefs = tag.find_all("a", class_="pageref")
     [pr.decompose() for pr in pagerefs]
     return re.sub(r"\s+", " ", tag.text)
@@ -30,12 +32,15 @@ def is_empty_or_nonword_p(tag: Tag) -> bool:
 
 def is_pagelink(tag: Tag) -> bool:
     pattern = re.compile("^page.+$")
-    if tag.get("id") != None and tag.get("name") != None:
-        return tag.name == "a" and (
-            pattern.match(tag.get("id")) or pattern.match(tag.get("name"))
-        )
-    else:
-        return False
+    return tag.name == "a" and (
+        pattern.match(tag.get("id") or "") or pattern.match(tag.get("name") or "")
+    )
+
+
+def replace_with_p(tag: Tag):
+    tag.name = "p"
+    tag.string = tag_to_text(tag)
+    del tag["class"]
 
 
 def clean_page(page: BeautifulSoup) -> None:
@@ -90,6 +95,15 @@ def clean_page(page: BeautifulSoup) -> None:
     for results in rulesets:
         [r.decompose() for r in results]
 
+    rulesets = [
+        # add letter as single paragraph (Edmond About - Die Spielhölle in Baden-Baden)
+        page.find_all("div", class_="letter"),
+        # add blockquote as single paragraph (Honoré de Balzac - Glanz und Elend der Kurtisanen)
+        page.find_all("blockquote"),
+    ]
+    for results in rulesets:
+        [replace_with_p(r) for r in results]
+
 
 def parse_single_book(work_dict):
     printf = open("parse_log.txt", "a")
@@ -106,11 +120,27 @@ def parse_single_book(work_dict):
     chapter_idx = 0
     chapters = []
 
-    for page in pages:
+    for page_idx, page in enumerate(pages):
         page_path = os.path.normpath(os.path.join(os.path.dirname(book_path), page))
         with open(page_path, "r", encoding="utf-8") as f:
             page_html = BeautifulSoup(f, features="lxml")
 
+        raw_paragraphs = page_html.find_all("p")
+        raw_paragraphs = [tag_to_text(p) for p in raw_paragraphs]
+        raw_paragraphs = [
+            p.strip() for p in raw_paragraphs if not p.isspace() and not p == ""
+        ]
+        titlepage_info_dict = {
+            "page_idx": page_idx,
+            "filepath": page_path,
+            "toc": page_html.find(True, class_="toc") is not None,
+            "dedication": page_html.find(True, class_="dedication"),
+            "titlepage": page_path.endswith("titlepage.html"),
+            "dedication": page_path.endswith("dedication.html"),
+            "paragraph_stats": [len(p.split(" ")) for p in raw_paragraphs],
+        }
+
+        TITLEPAGE_INFO.append(titlepage_info_dict)
         clean_page(page_html)
         if page_path.endswith("titlepage.html"):
             print("Titlepage: ", len(page_html.find_all("p")), page_path, file=printf)
@@ -123,7 +153,7 @@ def parse_single_book(work_dict):
         if len(chapter_headlines) == 0:
             chapter_dict = {"name": None, "idx": chapter_idx}
             paragraphs = page_html.find_all("p")
-            paragraphs = [p_tag_to_text(p) for p in paragraphs]
+            paragraphs = [tag_to_text(p) for p in paragraphs]
             paragraphs = [
                 p.strip() for p in paragraphs if not p.isspace() and not p == ""
             ]
@@ -137,23 +167,9 @@ def parse_single_book(work_dict):
             paragraphs = []
             # iterate through consecutive p-tags
             el = ch.find_next_sibling(True)
-            while el != None and el.name in ["p", "div", "blockquote"]:
-                class_ = el.get("class")
-                class_ = [] if class_ == None else class_
-                # TODO: div class "toc" is indicator of titlepage chapter
-                # add letter as single paragraph (Edmond About - Die Spielhölle in Baden-Baden)
-                if el.name == "div" and "letter" in class_:
-                    paragraphs.append(p_tag_to_text(el))
-                    el = el.find_next_sibling(True)
-                # add blockquote as single paragraph (Honoré de Balzac - Glanz und Elend der Kurtisanen)
-                elif el.name == "blockquote":
-                    paragraphs.append(p_tag_to_text(el))
-                    el = el.find_next_sibling(True)
-                elif el.name == "p":
-                    paragraphs.append(p_tag_to_text(el))
-                    el = el.find_next_sibling(True)
-                else:
-                    break
+            while el != None and el.name == "p":
+                paragraphs.append(tag_to_text(el))
+                el = el.find_next_sibling(True)
 
             # element is not P tag
             # for troubleshooting/finding edge cases:
@@ -188,7 +204,7 @@ def parse_single_book(work_dict):
 #     "title": "Test Title",
 #     "genre": "Test Genre",
 #     "webpath": "Test Path",
-#     "filepath": "/mnt/c/Users/Moritz Lahann/Desktop/STUDIUM/Module IAS/Master's Thesis/gutenberg-edition16/reuterc/schelmuf/titlepage.html",
+#     "filepath": "/mnt/c/Users/Moritz Lahann/Desktop/STUDIUM/Module IAS/Master's Thesis/gutenberg-edition16/zolling/million/million.html",
 # }
 
 # parse_single_book(work_dict)
@@ -260,11 +276,14 @@ print(len(work_dicts))
 for work in tqdm(work_dicts):
     try:
         parse_single_book(work)
-        with open(
-            f'corpus/{filename_from_path(work["filepath"])}', "w", encoding="utf-8"
-        ) as f:
-            json.dump(work, f, ensure_ascii=False)
+        # with open(
+        #     f'corpus/{filename_from_path(work["filepath"])}', "w", encoding="utf-8"
+        # ) as f:
+        #     json.dump(work, f, ensure_ascii=False)
     except UnicodeDecodeError:
         print("DECODE ERROR: ", work["filepath"])
     except FileNotFoundError:
         print("FILE NOT FOUND: ", work["filepath"])
+
+with open("non_book_chapter_data.json", "w", encoding="utf-8") as f:
+    json.dump(TITLEPAGE_INFO, f, ensure_ascii=False)

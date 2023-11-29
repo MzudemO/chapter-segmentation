@@ -44,6 +44,7 @@
     - anet/kleinsta/chap003.html 
     - anet/lydiaser/chap004.html 
     - balzac/kurtisan/chap001.html
+    - zolling/million/chap017.html
 * blockquote as 1 paragraph (hundreds of occurences, want to reduce jumps in text) 
     - about/badenbad/chap008.html
     - balzac/kurtisan/chap003.html
