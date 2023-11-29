@@ -31,6 +31,7 @@
 * `<aside>` (Emanuel Friedli - Bärndütsch als Spiegel bernischen Volkstums / Vierter Band)
 * `<pre>` (Georg Weerth - Leben und Taten des berühmten Ritters Schnapphahnski, Jules Verne - Die Kinder des Kapitän Grant. Erster Band)
 * `<span class="footnote">` (Petronius - Begebenheiten des Enkolp)
+* `<div class="figure">` (Robert Kraft - Die Vestalinnen. Band 1)
 * empty or completely non-word `<p>` (Henri Allais - Die Wachsbüste und andere Erzählungen, Scholem Alejchem - Aus dem nahen Osten)
 
 
