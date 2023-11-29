@@ -31,10 +31,8 @@ def is_empty_or_nonword_p(tag: Tag) -> bool:
 def is_pagelink(tag: Tag) -> bool:
     pattern = re.compile("^page.+$")
     if tag.get("id") != None and tag.get("name") != None:
-        return (
-            tag.name == "a"
-            and pattern.match(tag.get("id"))
-            and pattern.match(tag.get("name"))
+        return tag.name == "a" and (
+            pattern.match(tag.get("id")) or pattern.match(tag.get("name"))
         )
     else:
         return False

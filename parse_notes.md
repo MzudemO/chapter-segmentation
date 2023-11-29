@@ -5,9 +5,11 @@
 * no headline & first chapter could be title page? (Abraham a Sancta Clara - Verschiedenes, Karl Adolph - Von früher und heute, Alexandra, königliche Prinzessin von Bayern - Maiglöckchen)
     - `div class="toc">`?
     - `div class="dedication">`?
-    - "titlepage" in url?
-    - check if no p tag with text at all -> safe bet
-    - 1st pass: remove all empty p tags? alejchem/nahosten/chap002.html
+    - "titlepage" in url: 
+        - some counterexamples (Christoph Martin Wieland - Nachlaß des Diogenes von Sinope, Berthold Auerbach - Barfüßele, Ludwig Bechstein - Der Dunkelgraf, Daniel Defoe - Moll Flanders, Marie von Olfers - Frost in Blüthen)
+        - some are title pages with higher paragraph count (Hans Bethge - Der gelbe Kater, Edward Lytton Bulwer - Die Caxctons. Band I, Alphonse Daudet - Tartarin in den Alpen [has TOC])
+        - mix of paragraph count & paragraph length?
+        - duplicated content on titlepage (F.M. Dostojewski - Erniedrigte und Beleidigte, Das Gut Stepantschikowo und seine Bewohner, Aufzeichnungen aus einem toten Hause)
 * headline detection: 
     - table between headline & chapter (Willibald Alexis - Walladmor)
     - `<hr class="short"/>` (Henri Allais - Die Wachsbüste und andere Erzählungen)
@@ -17,7 +19,7 @@
 * `<ul>` (Charles Dickens - Klein-Dorrit. Zweites Buch)
 * `<p class="vers>` (Honoré de Balzac - Lebensbilder - Band 1)
 * `<h1>` (Rudolf Herzog - Wieland der Schmied, Gustav Aimard - Mexikanische Nächte Zweiter Theil, Wilkie Collins - Blinde Liebe. Zweiter Band, Louis Couperus - Herakles, Hans Fallada - Der eiserne Gustav)
-* `<a id="page###" name="page###">` various (e.g. Edward Bulwer-Lytton - Godolphin oder der Schwur)
+* `<a id="page###" name="page###">` various (e.g. Edward Bulwer-Lytton - Godolphin oder der Schwur, Gustav Meyrink - Das grüne Gesicht)
 * `<div class="poem">` (Ulrich Hegner - Die Molkenkur)
 * `<div class="motto">` (Scholem Alejchem - Aus dem nahen Osten)
 * `<div class="box">` (Georg Weerth - Leben und Taten des berühmten Ritters Schnapphahnski)
@@ -77,6 +79,7 @@
     - Ravi Ravendro - Tanzende Flamme (no clearly marked chapters)
     - Christian Reuter - Schelmuffsky (chapters clearly marked > 1 page)
     - Theodor Storm - Curator (no clearly marked chapters)
+    - Jean Paul - Das Kampaner Tal (chapters clearly marked > 1 page)
 * fucked up encoding & weird structure:
     - Hans Christian Andersen (Nur ein Geiger, Der Glücks-Peter, Der Improvisator, Oz, Sein oder Nichtsein)
     - Restif de la Bretonne - Anti-Justine
