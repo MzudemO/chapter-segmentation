@@ -6,7 +6,8 @@ from utils import filename_from_path
 import os
 import json
 
-TITLEPAGE_INFO = []
+# TITLEPAGE_INFO = []
+TITLEPAGE_WORD_COUNT_CUTOFF = 300
 
 
 def tag_to_text(tag: Tag) -> str:
@@ -125,43 +126,59 @@ def parse_single_book(work_dict):
         with open(page_path, "r", encoding="utf-8") as f:
             page_html = BeautifulSoup(f, features="lxml")
 
-        raw_paragraphs = page_html.find_all("p")
-        raw_paragraphs = [tag_to_text(p) for p in raw_paragraphs]
-        raw_paragraphs = [
-            p.strip() for p in raw_paragraphs if not p.isspace() and not p == ""
-        ]
-        titlepage_info_dict = {
-            "page_idx": page_idx,
-            "filepath": page_path,
-            "toc": page_html.find(True, class_="toc") is not None,
-            "dedication": page_html.find(True, class_="dedication"),
-            "titlepage": page_path.endswith("titlepage.html"),
-            "dedication": page_path.endswith("dedication.html"),
-            "paragraph_stats": [len(p.split(" ")) for p in raw_paragraphs],
-        }
+        # skip first page if < 300 words (titlepage, not a real chapter)
+        if page_idx == 0:
+            raw_paragraphs = page_html.find_all("p")
+            raw_paragraphs = [tag_to_text(p) for p in raw_paragraphs]
+            raw_paragraphs = [
+                p.strip() for p in raw_paragraphs if not p.isspace() and not p == ""
+            ]
+            word_count = sum([len(p.split(" ")) for p in raw_paragraphs])
+            if word_count < TITLEPAGE_WORD_COUNT_CUTOFF:
+                continue
 
-        TITLEPAGE_INFO.append(titlepage_info_dict)
-        clean_page(page_html)
-        if page_path.endswith("titlepage.html"):
-            print("Titlepage: ", len(page_html.find_all("p")), page_path, file=printf)
+        # skip dedication chapters
+        if page_path.endswith("dedication.html"):
             continue
+        # titlepage_info_dict = {
+        #     "page_idx": page_idx,
+        #     "filepath": page_path,
+        #     "toc": page_html.find(True, class_="toc") is not None,
+        #     "dedication": page_html.find(True, class_="dedication"),
+        #     "titlepage": page_path.endswith("titlepage.html"),
+        #     "dedication": page_path.endswith("dedication.html"),
+        #     "paragraph_stats": [len(p.split(" ")) for p in raw_paragraphs],
+        # }
+
+        # TITLEPAGE_INFO.append(titlepage_info_dict)
+        clean_page(page_html)
         chapter_headlines = page_html.find_all(is_headline_before_text)
         # can't safely assume that none-headline pages are new chapters
         # e.g. Christian Reuter - Schelmuffsky, Eufemia von Adlersfeld-Ballestrem - Der Maskenball in der Ca' Torcelli
-        # marked clearly in data with "name": None
-        # up to user whether to consider same or separate
+        # append to previous chapter
         if len(chapter_headlines) == 0:
-            chapter_dict = {"name": None, "idx": chapter_idx}
             paragraphs = page_html.find_all("p")
             paragraphs = [tag_to_text(p) for p in paragraphs]
             paragraphs = [
                 p.strip() for p in paragraphs if not p.isspace() and not p == ""
             ]
-            chapter_dict["paragraphs"] = paragraphs
-            chapters.append(chapter_dict)
-            chapter_idx += 1
-            print(f"No-headline chapter: {page_path}", file=printf)
-            continue
+            if chapter_idx == 0:
+                chapter_dict = {
+                    "name": None,
+                    "idx": chapter_idx,
+                    "paragraphs": paragraphs,
+                }
+                chapters.append(chapter_dict)
+                chapter_idx += 1
+                continue
+            else:
+                # concatenate to previous chapter
+                # dont increment chapter idx
+                chapters[chapter_idx - 1]["paragraphs"] = (
+                    chapters[chapter_idx - 1]["paragraphs"] + paragraphs
+                )
+                # print(f"No-headline chapter: {page_path}", file=printf)
+                continue
         for ch in chapter_headlines:
             chapter_dict = {"name": ch.text, "idx": chapter_idx}
             paragraphs = []
@@ -204,7 +221,7 @@ def parse_single_book(work_dict):
 #     "title": "Test Title",
 #     "genre": "Test Genre",
 #     "webpath": "Test Path",
-#     "filepath": "/mnt/c/Users/Moritz Lahann/Desktop/STUDIUM/Module IAS/Master's Thesis/gutenberg-edition16/zolling/million/million.html",
+#     "filepath": "/mnt/c/Users/Moritz Lahann/Desktop/STUDIUM/Module IAS/Master's Thesis/gutenberg-edition16/adlerrev/naemlich/naemlich.html",
 # }
 
 # parse_single_book(work_dict)
@@ -230,17 +247,37 @@ with open(root_path, "r", encoding="ISO-8859-1") as f:
 
 genres = [
     "Romane, Novellen und Erzählungen",
+    "Historische Romane und Erzählungen",
+    "Anthologien",
+    "Romanhafte Biographien",
+    "Märchen, Sagen, Legenden",
+    "Spannung und Abenteuer",
+    "Krimis, Thriller, Spionage",
+    "Historische Kriminalromane und -fälle",
+    "Science Fiction",
+    "Phantastische Literatur",
+    "Horror",
+    "Humor, Satire",
+    "Kinderbücher bis 11 Jahre",
+    "Kinderbücher ab 12 Jahren",
 ]
 
+
+def allowed_genre(tag: Tag) -> bool:
+    return tag.name == "a" and re.sub(r"\s+", " ", tag.text) in genres
+
+
 fiction_genre_list = soup.find("p", string="Belletristik").find_next_sibling("dl")
+genre_links = fiction_genre_list.find_all(allowed_genre)
 
 work_dicts = []
 
-for genre in genres:
-    link = fiction_genre_list.find("a", text=genre)
-    if link == None:
-        continue
-    anchor_id = link["href"].split("#")[-1]
+for genre_link in genre_links:
+    print(len(work_dicts))
+    # link = fiction_genre_list.find("a", text=genre)
+    # if link == None:
+    #     continue
+    anchor_id = genre_link["href"].split("#")[-1]
     book_list = soup.find("a", id=anchor_id).parent.find_next_sibling("dl")
     current = book_list.find(["dt", "dd"])
     while current != None:
@@ -258,7 +295,7 @@ for genre in genres:
             work_dict = {
                 "author": author,
                 "title": title,
-                "genre": genre,
+                "genre": re.sub(r"\s+", " ", genre_link.text),
                 "webpath": urllib.parse.urljoin(
                     "https://www.projekt-gutenberg.org/info/texte/allworka.html",
                     relative_path,
@@ -276,14 +313,14 @@ print(len(work_dicts))
 for work in tqdm(work_dicts):
     try:
         parse_single_book(work)
-        # with open(
-        #     f'corpus/{filename_from_path(work["filepath"])}', "w", encoding="utf-8"
-        # ) as f:
-        #     json.dump(work, f, ensure_ascii=False)
+        with open(
+            f'corpus/{filename_from_path(work["filepath"])}', "w", encoding="utf-8"
+        ) as f:
+            json.dump(work, f, ensure_ascii=False)
     except UnicodeDecodeError:
         print("DECODE ERROR: ", work["filepath"])
     except FileNotFoundError:
         print("FILE NOT FOUND: ", work["filepath"])
 
-with open("non_book_chapter_data.json", "w", encoding="utf-8") as f:
-    json.dump(TITLEPAGE_INFO, f, ensure_ascii=False)
+# with open("non_book_chapter_data.json", "w", encoding="utf-8") as f:
+#     json.dump(TITLEPAGE_INFO, f, ensure_ascii=False)

@@ -33,7 +33,9 @@
 * `<span class="footnote">` (Petronius - Begebenheiten des Enkolp)
 * `<div class="figure">` (Robert Kraft - Die Vestalinnen. Band 1)
 * empty or completely non-word `<p>` (Henri Allais - Die Wachsbüste und andere Erzählungen, Scholem Alejchem - Aus dem nahen Osten)
-
+* dedication can always be skipped (Aubrey Beardley - Venus und Tannhäuser longest with 933 words, not a real chapter)
+* titlepage & toc not necessarily indicative
+* first chapter where word count < 300 -> considered as not a real chapter
 
 # Keep
 
