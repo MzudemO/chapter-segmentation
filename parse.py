@@ -3,111 +3,34 @@ import urllib
 from bs4 import BeautifulSoup, Tag
 from tqdm import tqdm
 from utils import filename_from_path
+from parse_utils import *
 import os
 import json
+import argparse
 
-# TITLEPAGE_INFO = []
+LOG_PATH = "parse_log.txt"
+TITLEPAGE_INFO = []
 TITLEPAGE_WORD_COUNT_CUTOFF = 300
+GENRE_LIST = [
+    "Romane, Novellen und Erzählungen",
+    "Historische Romane und Erzählungen",
+    "Anthologien",
+    "Romanhafte Biographien",
+    "Märchen, Sagen, Legenden",
+    "Spannung und Abenteuer",
+    "Krimis, Thriller, Spionage",
+    "Historische Kriminalromane und -fälle",
+    "Science Fiction",
+    "Phantastische Literatur",
+    "Horror",
+    "Humor, Satire",
+    "Kinderbücher bis 11 Jahre",
+    "Kinderbücher ab 12 Jahren",
+]
 
 
-def tag_to_text(tag: Tag) -> str:
-    pagerefs = tag.find_all("a", class_="pageref")
-    [pr.decompose() for pr in pagerefs]
-    return re.sub(r"\s+", " ", tag.text)
-
-
-def is_headline_before_text(tag: Tag) -> bool:
-    next_sibling = tag.find_next_sibling(True)
-    if tag.name in ["h2", "h3", "h4"] and next_sibling is None:
-        return False
-    else:
-        return tag.name in ["h2", "h3", "h4"] and next_sibling.name == "p"
-
-
-def is_empty_or_nonword_p(tag: Tag) -> bool:
-    if tag.name == "p":
-        return tag.text.isspace() or re.search(r"\w", tag.text) is None
-    else:
-        return False
-
-
-def is_pagelink(tag: Tag) -> bool:
-    pattern = re.compile("^page.+$")
-    return tag.name == "a" and (
-        pattern.match(tag.get("id") or "") or pattern.match(tag.get("name") or "")
-    )
-
-
-def replace_with_p(tag: Tag):
-    tag.name = "p"
-    tag.string = tag_to_text(tag)
-    del tag["class"]
-
-
-def clean_page(page: BeautifulSoup) -> None:
-    rulesets = [
-        page.find_all("a", class_="pageref"),
-        page.find_all(is_pagelink),
-        # non-chapter breaking headlines (Edmondo De Amicis - Unsere Freunde)
-        page.find_all("h5"),
-        # non-chapter breaking headlines (Max Bartel - Aufstieg der Begabten)
-        page.find_all("h6"),
-        # non-chapter breaking headlines (Rudolf Herzog - Wieland der Schmied)
-        page.find_all("h1"),
-        # poetry/lyrics (Honoré de Balzac - Lebensbilder - Band 1)
-        page.find_all("p", class_="vers"),
-        # breaks (Willibald Alexis - Ruhe ist die erste Bürgerpflicht, Alkiphron - Hetärenbriefe)
-        page.find_all("br"),
-        # single hr spacer (Hugo Salus - Der Spiegel)
-        page.find_all("hr"),
-        # *** spacer (Seestern - 1906)
-        page.find_all("p", class_="stars"),
-        # short poetry and other tables (Willibald Alexis - Ruhe ist die erste Bürgerpflicht, Roland Betsch - Der Wilde Freiger)
-        page.find_all("table"),
-        # image spacer (Robert Kraft - Die Vestalinnen, Band 1)
-        page.find_all("div", class_="figure"),
-        # poetry/lyrics (Ulrich Hegner - Die Molkenkur)
-        page.find_all("div", class_="poem"),
-        # motto (Scholem Alejchem - Aus dem nahen Osten)
-        page.find_all("div", class_="motto"),
-        # poster (Arkadij Awertschenko - Kurzgeschichten)
-        page.find_all("div", class_="plakat"),
-        # poetry/lyrics (Otto Julius Bierbaum - Sinaide)
-        page.find_all("div", class_="vers"),
-        # box formatting (Georg Weerth - Leben und Taten des berühmten Ritters Schnapphahnski)
-        page.find_all("div", class_="box"),
-        # irregular formatted text (Georg Weerth - Leben und Taten des berühmten Ritters Schnapphahnski)
-        page.find_all("pre"),
-        # in-text footnotes (Petronius - Begebenheiten des Enkolp)
-        page.find_all("span", class_="footnote"),
-        # images (Hanns Heiz Ewers - Grotesken)
-        page.find_all("img"),
-        # lists (Karl Adolph - Haus Nummer 37)
-        page.find_all("ol"),
-        # lists (Charles Dickens - Klein-Dorrit. Zweites Buch)
-        page.find_all("ul"),
-        # aside images (Emanuel Friedli - Bärndütsch als Spiegel bernischen Volkstums / Vierter Band)
-        page.find_all("aside"),
-        # address (Adelheid von Auer - Fußstapfen im Sande. Erster Band)
-        page.find_all("address"),
-        # * spacer, ...
-        page.find_all(is_empty_or_nonword_p),
-    ]
-    for results in rulesets:
-        [r.decompose() for r in results]
-
-    rulesets = [
-        # add letter as single paragraph (Edmond About - Die Spielhölle in Baden-Baden)
-        page.find_all("div", class_="letter"),
-        # add blockquote as single paragraph (Honoré de Balzac - Glanz und Elend der Kurtisanen)
-        page.find_all("blockquote"),
-    ]
-    for results in rulesets:
-        [replace_with_p(r) for r in results]
-
-
-def parse_single_book(work_dict):
-    printf = open("parse_log.txt", "a")
+def parse_single_book(work_dict, titlepage_info=False):
+    printf = open(LOG_PATH, "a")
 
     book_path = work_dict["filepath"]
     with open(book_path, "r", encoding="utf-8") as f:
@@ -140,17 +63,18 @@ def parse_single_book(work_dict):
         # skip dedication chapters
         if page_path.endswith("dedication.html"):
             continue
-        # titlepage_info_dict = {
-        #     "page_idx": page_idx,
-        #     "filepath": page_path,
-        #     "toc": page_html.find(True, class_="toc") is not None,
-        #     "dedication": page_html.find(True, class_="dedication"),
-        #     "titlepage": page_path.endswith("titlepage.html"),
-        #     "dedication": page_path.endswith("dedication.html"),
-        #     "paragraph_stats": [len(p.split(" ")) for p in raw_paragraphs],
-        # }
+        if titlepage_info:
+            titlepage_info_dict = {
+                "page_idx": page_idx,
+                "filepath": page_path,
+                "toc": page_html.find(True, class_="toc") is not None,
+                "dedication": page_html.find(True, class_="dedication"),
+                "titlepage": page_path.endswith("titlepage.html"),
+                "dedication": page_path.endswith("dedication.html"),
+                "paragraph_stats": [len(p.split(" ")) for p in raw_paragraphs],
+            }
+            TITLEPAGE_INFO.append(titlepage_info_dict)
 
-        # TITLEPAGE_INFO.append(titlepage_info_dict)
         clean_page(page_html)
         chapter_headlines = page_html.find_all(is_headline_before_text)
         # can't safely assume that none-headline pages are new chapters
@@ -177,7 +101,6 @@ def parse_single_book(work_dict):
                 chapters[chapter_idx - 1]["paragraphs"] = (
                     chapters[chapter_idx - 1]["paragraphs"] + paragraphs
                 )
-                # print(f"No-headline chapter: {page_path}", file=printf)
                 continue
         for ch in chapter_headlines:
             chapter_dict = {"name": ch.text, "idx": chapter_idx}
@@ -215,112 +138,106 @@ def parse_single_book(work_dict):
     printf.close()
 
 
-# testing
-# work_dict = {
-#     "author": "Test Author",
-#     "title": "Test Title",
-#     "genre": "Test Genre",
-#     "webpath": "Test Path",
-#     "filepath": "/mnt/c/Users/Moritz Lahann/Desktop/STUDIUM/Module IAS/Master's Thesis/gutenberg-edition16/adlerrev/naemlich/naemlich.html",
-# }
-
-# parse_single_book(work_dict)
-
-# with open("test_single_book_parse.json", "w", encoding="utf-8") as f:
-#     json.dump(work_dict, f, ensure_ascii=False)
-# print("done")
-# input("")
-
-
-# "lastname, firstname" -> "firstname lastname"
-def normalize_author(name: str) -> str:
-    names = name.split(",")
-    names = [n.strip() for n in names]
-    names.reverse()
-    return " ".join(names)
-
-
-root_path = "/mnt/c/Users/Moritz Lahann/Desktop/STUDIUM/Module IAS/Master's Thesis/gutenberg-edition16/info/texte/lesetips.html"
-
-with open(root_path, "r", encoding="ISO-8859-1") as f:
-    soup = BeautifulSoup(f, features="lxml")
-
-genres = [
-    "Romane, Novellen und Erzählungen",
-    "Historische Romane und Erzählungen",
-    "Anthologien",
-    "Romanhafte Biographien",
-    "Märchen, Sagen, Legenden",
-    "Spannung und Abenteuer",
-    "Krimis, Thriller, Spionage",
-    "Historische Kriminalromane und -fälle",
-    "Science Fiction",
-    "Phantastische Literatur",
-    "Horror",
-    "Humor, Satire",
-    "Kinderbücher bis 11 Jahre",
-    "Kinderbücher ab 12 Jahren",
-]
-
-
 def allowed_genre(tag: Tag) -> bool:
-    return tag.name == "a" and re.sub(r"\s+", " ", tag.text) in genres
+    return tag.name == "a" and re.sub(r"\s+", " ", tag.text) in GENRE_LIST
 
 
-fiction_genre_list = soup.find("p", string="Belletristik").find_next_sibling("dl")
-genre_links = fiction_genre_list.find_all(allowed_genre)
+if __name__ == "__main__":
+    # cleanup log file
+    with open(LOG_PATH, "w") as f:
+        f.write("")
 
-work_dicts = []
+    # root_path = "/mnt/c/Users/Moritz Lahann/Desktop/STUDIUM/Module IAS/Master's Thesis/gutenberg-edition16/info/texte/lesetips.html"
+    parser = argparse.ArgumentParser(
+        description="Parse dataset from raw GutenbergDE HTML."
+    )
+    parser.add_argument("base_path", type=str, help="path to the GutenbergDE folder")
+    parser.add_argument(
+        "--titlepage-info",
+        action="store_true",
+        help="collect chapter statistics (default: False)",
+    )
+    parser.add_argument(
+        "--test-single", type=str, help="Path to a single book for testing purposes"
+    )
 
-for genre_link in genre_links:
-    print(len(work_dicts))
-    # link = fiction_genre_list.find("a", text=genre)
-    # if link == None:
-    #     continue
-    anchor_id = genre_link["href"].split("#")[-1]
-    book_list = soup.find("a", id=anchor_id).parent.find_next_sibling("dl")
-    current = book_list.find(["dt", "dd"])
-    while current != None:
-        # skip interspersed book covers
-        if current.name == "dt" and current.find("img") != None:
-            current = current.find_next_sibling("dt")
-        else:
-            # remove alphabetic marks in Romane, Novellen und Erzählungen
-            alphabetic_marks = current.find_all("b")
-            [am.decompose() for am in alphabetic_marks]
-            author = normalize_author(current.text)
-            book_link = current.find_next_sibling("dd").a
-            title = book_link.text
-            relative_path = book_link["href"]
-            work_dict = {
-                "author": author,
-                "title": title,
-                "genre": re.sub(r"\s+", " ", genre_link.text),
-                "webpath": urllib.parse.urljoin(
-                    "https://www.projekt-gutenberg.org/info/texte/allworka.html",
-                    relative_path,
-                ),
-                "filepath": os.path.normpath(
-                    os.path.join(os.path.dirname(root_path), relative_path)
-                ),
-            }
-            work_dicts.append(work_dict)
+    args = parser.parse_args()
 
-            # continue loop
-            current = current.find_next_sibling("dt")
+    if args.test_single is not None:
+        work_dict = {
+            "author": "Test Author",
+            "title": "Test Title",
+            "genre": "Test Genre",
+            "webpath": "Test Path",
+            "filepath": args.test_single,
+        }
 
-print(len(work_dicts))
-for work in tqdm(work_dicts):
-    try:
-        parse_single_book(work)
-        with open(
-            f'corpus/{filename_from_path(work["filepath"])}', "w", encoding="utf-8"
-        ) as f:
-            json.dump(work, f, ensure_ascii=False)
-    except UnicodeDecodeError:
-        print("DECODE ERROR: ", work["filepath"])
-    except FileNotFoundError:
-        print("FILE NOT FOUND: ", work["filepath"])
+        parse_single_book(work_dict)
 
-# with open("non_book_chapter_data.json", "w", encoding="utf-8") as f:
-#     json.dump(TITLEPAGE_INFO, f, ensure_ascii=False)
+        with open("test_single_book_parse.json", "w", encoding="utf-8") as f:
+            json.dump(work_dict, f, ensure_ascii=False)
+    else:
+        root_path = os.path.join(args.base_path, "info/texte/lesetips.html")
+
+        with open(root_path, "r", encoding="ISO-8859-1") as f:
+            soup = BeautifulSoup(f, features="lxml")
+
+        fiction_genre_list = soup.find("p", string="Belletristik").find_next_sibling(
+            "dl"
+        )
+        genre_links = fiction_genre_list.find_all(allowed_genre)
+
+        work_dicts = []
+
+        for genre_link in genre_links:
+            print(len(work_dicts))
+            anchor_id = genre_link["href"].split("#")[-1]
+            book_list = soup.find("a", id=anchor_id).parent.find_next_sibling("dl")
+            current = book_list.find(["dt", "dd"])
+            while current != None:
+                # skip interspersed book covers
+                if current.name == "dt" and current.find("img") != None:
+                    current = current.find_next_sibling("dt")
+                else:
+                    # remove alphabetic marks in Romane, Novellen und Erzählungen
+                    alphabetic_marks = current.find_all("b")
+                    [am.decompose() for am in alphabetic_marks]
+                    author = normalize_author(current.text)
+                    book_link = current.find_next_sibling("dd").a
+                    title = book_link.text
+                    relative_path = book_link["href"]
+                    work_dict = {
+                        "author": author,
+                        "title": title,
+                        "genre": re.sub(r"\s+", " ", genre_link.text),
+                        "webpath": urllib.parse.urljoin(
+                            "https://www.projekt-gutenberg.org/info/texte/allworka.html",
+                            relative_path,
+                        ),
+                        "filepath": os.path.normpath(
+                            os.path.join(os.path.dirname(root_path), relative_path)
+                        ),
+                    }
+                    work_dicts.append(work_dict)
+
+                    # continue loop
+                    current = current.find_next_sibling("dt")
+
+        print(len(work_dicts))
+        for work in tqdm(work_dicts):
+            try:
+                parse_single_book(work, titlepage_info=args.titlepage_info)
+                with open(
+                    f'corpus/{filename_from_path(work["filepath"])}',
+                    "w",
+                    encoding="utf-8",
+                ) as f:
+                    json.dump(work, f, ensure_ascii=False)
+            except UnicodeDecodeError:
+                print("DECODE ERROR: ", work["filepath"])
+            except FileNotFoundError:
+                print("FILE NOT FOUND: ", work["filepath"])
+
+        if args.titlepage_info:
+            with open("non_book_chapter_data.json", "w", encoding="utf-8") as f:
+                json.dump(TITLEPAGE_INFO, f, ensure_ascii=False)
