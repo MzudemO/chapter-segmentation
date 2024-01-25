@@ -85,5 +85,6 @@ if __name__ == "__main__":
     tokenizer = BertTokenizerFast.from_pretrained("deepset/gbert-base")
     print(len(train))
     print(len(test))
+    input("")
     save_split("train", train, tokenizer)
     save_split("test", test, tokenizer)

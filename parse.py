@@ -48,7 +48,6 @@ def parse_single_book(work_dict, titlepage_info=False):
         page_path = os.path.normpath(os.path.join(os.path.dirname(book_path), page))
         with open(page_path, "r", encoding="utf-8") as f:
             page_html = BeautifulSoup(f, features="lxml")
-
         # skip first page if < 300 words (titlepage, not a real chapter)
         if page_idx == 0:
             raw_paragraphs = page_html.find_all("p")
@@ -69,7 +68,7 @@ def parse_single_book(work_dict, titlepage_info=False):
                 "page_idx": page_idx,
                 "filepath": page_path,
                 "toc": page_html.find(True, class_="toc") is not None,
-                "dedication": page_html.find(True, class_="dedication"),
+                "dedication_class": page_html.find(True, class_="dedication"),
                 "titlepage": page_path.endswith("titlepage.html"),
                 "dedication": page_path.endswith("dedication.html"),
                 "paragraph_stats": [len(p.split(" ")) for p in raw_paragraphs],
