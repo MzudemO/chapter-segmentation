@@ -119,7 +119,7 @@ if __name__ == "__main__":
     loss_wrapper = LossWrapper()
 
     num_epochs = 1
-    num_iter = num_epochs * len(data_loader_wrapper)
+    num_iter = num_epochs * len(train_dataloader)
     optimizer = AdamW(model.parameters(), lr=1e-5)
     lr_finder = LRFinder(model_wrapper, optimizer, loss_wrapper, device=device)
     lr_finder.range_test(data_loader_wrapper, end_lr=1, num_iter=num_iter)
@@ -128,6 +128,6 @@ if __name__ == "__main__":
     lr_finder.plot(ax=ax, suggest_lr=True)
     plt.savefig("figures/lr_range.svg")
     with open("lr_range_test.json", "w") as f:
-        json.dump(lr_finder.history)
+        json.dump(lr_finder.history, f)
 
     lr_finder.reset()
