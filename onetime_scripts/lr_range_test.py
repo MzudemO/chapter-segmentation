@@ -5,7 +5,7 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm
 from transformers import BertForNextSentencePrediction, BertTokenizer, get_scheduler
 import transformers
-from torch_lr_finder import LRFinder, TrainDataLoaderIter
+from torch_lr_finder import LRFinder, TrainDataLoaderIter, ValDataLoaderIter
 from torch import nn
 import json
 import matplotlib.pyplot as plt
@@ -55,7 +55,16 @@ class BertModelWrapper(nn.Module):
         return outputs
 
 
-class DataLoaderWrapper(TrainDataLoaderIter):
+class TrainDataLoaderWrapper(TrainDataLoaderIter):
+    def __init__(self, data_loader, auto_reset=True):
+        super().__init__(data_loader)
+        self.auto_reset = auto_reset
+
+    def inputs_labels_from_batch(self, batch_data):
+        labels = batch_data["labels"]
+        return (batch_data, labels)
+
+class ValDataLoaderWrapper(ValDataLoaderIter):
     def __init__(self, data_loader, auto_reset=True):
         super().__init__(data_loader)
         self.auto_reset = auto_reset
@@ -81,7 +90,7 @@ if __name__ == "__main__":
 
     model = BertForNextSentencePrediction.from_pretrained(
         "deepset/gbert-base",
-        # cache_dir="/raid/6lahann/.cache/huggingface/transformers"
+        cache_dir="/raid/6lahann/.cache/huggingface/transformers"
     )
     model = model.to(device)
 
@@ -92,7 +101,7 @@ if __name__ == "__main__":
         data_files={"train_balanced": "balanced_train_df.csv"},
         split="train_balanced",
         use_auth_token=auth_token,
-        # cache_dir="/raid/6lahann/.cache/huggingface/datasets",
+        cache_dir="/raid/6lahann/.cache/huggingface/datasets",
     )
     print(f"No. of examples: {len(dataset)}")
     dataset = dataset.shuffle(seed=6948050)
@@ -111,23 +120,41 @@ if __name__ == "__main__":
         device=device,
     )
 
+    val_ds = dataset["test"]
+    val_ds = val_ds.map(
+        lambda example: preprocess(example, tokenizer),
+        batched=True,
+        batch_size=BATCH_SIZE,
+        new_fingerprint="lr_range_test_val",
+    )
+    val_ds = val_ds.with_format(
+        "torch",
+        columns=["input_ids", "token_type_ids", "attention_mask", "labels"],
+        device=device,
+    )
+
     BATCH_SIZE = 8
 
     train_dataloader = DataLoader(train_ds, batch_size=BATCH_SIZE)
-    data_loader_wrapper = DataLoaderWrapper(train_dataloader)
+    train_data_loader_wrapper = TrainDataLoaderWrapper(train_dataloader)
+    
+    val_dataloader = DataLoader(val_ds, batch_size=BATCH_SIZE)
+    val_data_loader_wrapper = ValDataLoaderWrapper(val_dataloader)
+
     model_wrapper = BertModelWrapper(model, device)
     loss_wrapper = LossWrapper()
 
-    num_epochs = 1
-    num_iter = num_epochs * len(train_dataloader)
+    num_epochs = 3
+    # num_iter = num_epochs * len(train_dataloader)
+    num_iter = 50
     optimizer = AdamW(model.parameters(), lr=1e-5)
     lr_finder = LRFinder(model_wrapper, optimizer, loss_wrapper, device=device)
-    lr_finder.range_test(data_loader_wrapper, end_lr=1, num_iter=num_iter)
+    lr_finder.range_test(train_data_loader_wrapper, val_loader=val_data_loader_wrapper, end_lr=1, num_iter=num_iter, diverge_th=10, step_mode="linear")
 
     fig, ax = plt.subplots()
-    lr_finder.plot(ax=ax, suggest_lr=True)
-    plt.savefig("figures/lr_range.svg")
-    with open("lr_range_test.json", "w") as f:
+    lr_finder.plot(ax=ax, suggest_lr=True, log_lr=False)
+    plt.savefig("figures/lr_range_linear.svg")
+    with open("lr_range_test_linear.json", "w") as f:
         json.dump(lr_finder.history, f)
 
     lr_finder.reset()
