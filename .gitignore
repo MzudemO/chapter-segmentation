@@ -11,3 +11,5 @@ eval-dataset/
 *.zip
 parse_log.txt
 test_single_book_parse.json
+test_trainer/
+!test_trainer/*/trainer_state.json
