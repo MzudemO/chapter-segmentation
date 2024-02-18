@@ -112,6 +112,10 @@ if __name__ == "__main__":
         save_strategy="epoch",
         dataloader_pin_memory=False,
         gradient_accumulation_steps=4,
+        save_total_limit=2,
+        load_best_model_at_end=True,
+        metric_for_best_model="f1",
+        greater_is_better=True
         )
     trainer = Trainer(model=model, args=training_args, train_dataset=train_ds, eval_dataset=val_ds, compute_metrics=compute_metrics)
 

@@ -144,17 +144,18 @@ if __name__ == "__main__":
     model_wrapper = BertModelWrapper(model, device)
     loss_wrapper = LossWrapper()
 
-    num_epochs = 3
-    # num_iter = num_epochs * len(train_dataloader)
-    num_iter = 50
-    optimizer = AdamW(model.parameters(), lr=1e-5)
+    num_epochs = 1
+    num_iter = num_epochs * len(train_dataloader)
+    # num_iter = 50
+    optimizer = AdamW(model.parameters(), lr=1e-10)
     lr_finder = LRFinder(model_wrapper, optimizer, loss_wrapper, device=device)
-    lr_finder.range_test(train_data_loader_wrapper, val_loader=val_data_loader_wrapper, end_lr=1, num_iter=num_iter, diverge_th=10, step_mode="linear")
+    lr_finder.range_test(train_data_loader_wrapper, end_lr=1e-2, num_iter=num_iter)
+    # lr_finder.range_test(train_data_loader_wrapper, val_loader=val_data_loader_wrapper, end_lr=1, num_iter=num_iter, diverge_th=10, step_mode="linear")
 
     fig, ax = plt.subplots()
     lr_finder.plot(ax=ax, suggest_lr=True, log_lr=False)
-    plt.savefig("figures/lr_range_linear.svg")
-    with open("lr_range_test_linear.json", "w") as f:
+    plt.savefig("figures/lr_range_exponential_-10.svg")
+    with open("lr_range_test_exponential_-10.json", "w") as f:
         json.dump(lr_finder.history, f)
 
     lr_finder.reset()
