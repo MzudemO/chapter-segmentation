@@ -5,49 +5,29 @@ import pandas as pd
 from tqdm import tqdm
 from transformers import BertForNextSentencePrediction, BertTokenizer
 import transformers
-
-
-def preprocess(example, tokenizer):
-    sequences = zip(example["p1_tokens"], example["p2_tokens"])
-    batch_encoding = tokenizer.batch_encode_plus(
-        sequences,
-        # add_special_tokens=True, seems to be a bug with the argument handling
-        padding="max_length",
-        truncation=True,
-        max_length=512,
-        return_tensors="pt",
-        return_token_type_ids=True,
-        return_attention_mask=True,
-    )
-
-    output = batch_encoding
-    output["book"] = example["book"]
-    output["chapter"] = example["chapter"]
-    output["paragraph"] = example["paragraph"]
-    labels = example["is_continuation"]
-    output["label"] = example["label"]
-    return output
-
+from utils import preprocess
 
 if __name__ == "__main__":
     results = []
     BATCH_SIZE = 8
-    transformers.logging.set_verbosity_error() # prevents log spam from false positive warning
-    torch.set_num_threads(1) # try to prevent 100% cpu usage
 
     # Model and device setup
-    print(
-        f"Devices available: {torch.cuda.device_count()}. Device 0: {torch.cuda.get_device_name(0)}."
-    )
+    if torch.cuda.device_count() > 0:
+        print(
+            f"Devices available: {torch.cuda.device_count()}. Device 0: {torch.cuda.get_device_name(0)}."
+        )
+        device = torch.device("cuda")
+    else:
+        device = torch.device("cpu")
+
     auth_token = input("Enter auth token: ").strip()
-    device = torch.device("cuda")
     tokenizer = BertTokenizer.from_pretrained("deepset/gbert-base")
 
     model = BertForNextSentencePrediction.from_pretrained(
-        "MzudemO/chapter-segmentation-model", 
-        revision="752630c190621d1cf28350bb83dff2f0d7749344", 
-        use_auth_token=auth_token, 
-        cache_dir="/raid/6lahann/.cache/huggingface/transformers"
+        "MzudemO/chapter-segmentation-model",
+        revision="752630c190621d1cf28350bb83dff2f0d7749344",
+        use_auth_token=auth_token,
+        cache_dir="/raid/6lahann/.cache/huggingface/transformers",
     )
 
     model = model.to(device)
@@ -65,7 +45,7 @@ if __name__ == "__main__":
         lambda example: preprocess(example, tokenizer),
         batched=True,
         batch_size=BATCH_SIZE,
-        new_fingerprint="test_2023-05-26 01_40"
+        new_fingerprint="test_2024-02-20 13_11",
     )
     dataset = dataset.with_format(
         "torch",
@@ -74,38 +54,28 @@ if __name__ == "__main__":
             "token_type_ids",
             "attention_mask",
             "label",
-            "book",
-            "chapter",
-            "paragraph",
+            "book_path",
+            "chapter_idx",
+            "paragraph_idx",
         ],
         device=device,
     )
 
-    dataloader = DataLoader(dataset, batch_size=BATCH_SIZE, pin_memory=False, num_workers=0)
+    dataloader = DataLoader(
+        dataset, batch_size=BATCH_SIZE, pin_memory=False, num_workers=0
+    )
 
     model.eval()
 
     for batch in tqdm(dataloader):
-        d_batch = (
-            batch["input_ids"],
-            batch["token_type_ids"],
-            batch["attention_mask"],
-            batch["label"],
-        )
-        d_batch = tuple(t.to(device) for t in d_batch)
-        b_input_ids, b_token_type_ids, b_attention_masks, b_labels = d_batch
+        batch = {k: v.to(device) for k, v in batch.items()}
+
         with torch.no_grad():
-            outputs = model(
-                b_input_ids,
-                token_type_ids=b_token_type_ids,
-                attention_mask=b_attention_masks,
-            )
+            outputs = model(**batch)
 
-        logits = outputs[0]
+        logits = outputs.logits
 
-        logits = logits.detach().cpu().numpy()
-        
-        for index, logit in enumerate(logits): 
+        for index, logit in enumerate(logits):
             results.append(
                 [
                     batch["book"][index],
@@ -120,9 +90,9 @@ if __name__ == "__main__":
     df = pd.DataFrame(results)
     df = df.rename(
         columns={
-            0: "book",
-            1: "chapter",
-            2: "paragraph",
+            0: "book_path",
+            1: "chapter_idx",
+            2: "paragraph_idx",
             3: "label",
             4: "logit_0",
             5: "logit_1",

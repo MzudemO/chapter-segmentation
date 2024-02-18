@@ -14,7 +14,9 @@ def tokenize_sequence(sequence: List, tokenizer: BertTokenizerFast) -> List:
     return [p1[-254:], p2[:254], is_continuation]
 
 
-def save_split(split: str, paths: List[str], tokenizer: BertTokenizerFast):
+def save_split(
+    split: str, paths: List[str], tokenizer: BertTokenizerFast, is_test: bool = False
+):
     pd.DataFrame(
         {
             "p1_tokens": [],
@@ -44,13 +46,18 @@ def save_split(split: str, paths: List[str], tokenizer: BertTokenizerFast):
                         ],
                         tokenizer,
                     )
-                    pd.DataFrame(
+                    df = pd.DataFrame(
                         {
                             "p1_tokens": [sequence[0]],
                             "p2_tokens": [sequence[1]],
                             "is_continuation": [sequence[2]],
                         }
-                    ).to_csv(f"{split}_df.csv", index=False, header=False, mode="a")
+                    )
+                    if is_test:
+                        df["book_path"] = path
+                        df["chapter_idx"] = chapter_index
+                        df["paragraph_idx"] = paragraph_index
+                    df.to_csv(f"{split}_df.csv", index=False, header=False, mode="a")
 
                 elif paragraph_index > 0:
                     previous_paragraph = " ".join(paragraphs[0:paragraph_index])
@@ -60,13 +67,18 @@ def save_split(split: str, paths: List[str], tokenizer: BertTokenizerFast):
                     sequence = tokenize_sequence(
                         [previous_paragraph, paragraph, True], tokenizer
                     )
-                    pd.DataFrame(
+                    df = pd.DataFrame(
                         {
                             "p1_tokens": [sequence[0]],
                             "p2_tokens": [sequence[1]],
                             "is_continuation": [sequence[2]],
                         }
-                    ).to_csv(f"{split}_df.csv", index=False, header=False, mode="a")
+                    )
+                    if is_test:
+                        df["book_path"] = path
+                        df["chapter_idx"] = chapter_index
+                        df["paragraph_idx"] = paragraph_index
+                    df.to_csv(f"{split}_df.csv", index=False, header=False, mode="a")
                     if (
                         len(previous_paragraph.split(" ")) > 254
                         and len(sequence[0]) < 254
@@ -87,4 +99,4 @@ if __name__ == "__main__":
     print(len(test))
     input("")
     save_split("train", train, tokenizer)
-    save_split("test", test, tokenizer)
+    save_split("test_per_book", test, tokenizer, is_test=True)

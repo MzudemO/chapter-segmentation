@@ -3,15 +3,22 @@ import torch
 from torch.optim import AdamW
 from torch.utils.data import DataLoader
 from tqdm import tqdm
-from transformers import BertForNextSentencePrediction, BertTokenizer, get_scheduler, TrainingArguments, Trainer
+from transformers import (
+    BertForNextSentencePrediction,
+    BertTokenizer,
+    get_scheduler,
+    TrainingArguments,
+    Trainer,
+)
 import transformers
 import evaluate
 import json
 import numpy as np
 
-from utils import flat_accuracy
+from utils import preprocess
 
 metric = evaluate.combine(["accuracy", "f1", "precision", "recall"])
+
 
 def compute_metrics(eval_pred):
     logits, labels = eval_pred
@@ -20,29 +27,8 @@ def compute_metrics(eval_pred):
     print(labels)
     return metric.compute(predictions=predictions, references=labels)
 
-def preprocess(example, tokenizer):
-    p1_tokens = list(map(json.loads, example["p1_tokens"]))
-    p2_tokens = list(map(json.loads, example["p2_tokens"]))
-    sequences = list(zip(p1_tokens, p2_tokens))
-    labels = example["is_continuation"]
-    batch_encoding = tokenizer.batch_encode_plus(
-        sequences,
-        add_special_tokens=True,
-        padding="max_length",
-        truncation=True,
-        max_length=512,
-        return_tensors="pt",
-        return_token_type_ids=True,
-        return_attention_mask=True,
-    )
-
-    output = batch_encoding
-    output["labels"] = torch.tensor(labels, dtype=torch.uint8)
-    return output
 
 if __name__ == "__main__":
-    # transformers.logging.set_verbosity_error()  # prevents log spam from false positive warning
-
     # Model and device setup
     if torch.cuda.device_count() > 0:
         print(
@@ -52,7 +38,12 @@ if __name__ == "__main__":
     else:
         device = torch.device("cpu")
 
-    hyperparams = {"model": "deepset/gbert-base", "learning_rate": 1e-6, "batch_size": 8, "num_epochs": 4}
+    hyperparams = {
+        "model": "deepset/gbert-base",
+        "learning_rate": 1e-6,
+        "batch_size": 8,
+        "num_epochs": 4,
+    }
     print("Hyperparams: ", hyperparams)
 
     tokenizer = BertTokenizer.from_pretrained(hyperparams["model"])
@@ -60,7 +51,6 @@ if __name__ == "__main__":
         hyperparams["model"], cache_dir="/raid/6lahann/.cache/huggingface/transformers"
     )
     model = model.to(device)
-
 
     # Dataset setup
     auth_token = input("Enter auth token: ").strip()
@@ -115,8 +105,14 @@ if __name__ == "__main__":
         save_total_limit=2,
         load_best_model_at_end=True,
         metric_for_best_model="f1",
-        greater_is_better=True
-        )
-    trainer = Trainer(model=model, args=training_args, train_dataset=train_ds, eval_dataset=val_ds, compute_metrics=compute_metrics)
+        greater_is_better=True,
+    )
+    trainer = Trainer(
+        model=model,
+        args=training_args,
+        train_dataset=train_ds,
+        eval_dataset=val_ds,
+        compute_metrics=compute_metrics,
+    )
 
     trainer.train()

@@ -5,6 +5,7 @@ import pandas as pd
 import random
 import matplotlib.pyplot as plt
 import os
+import torch
 
 
 # taken from keras to avoid dependency
@@ -109,3 +110,24 @@ def filename_from_path(path, extension="json"):
     return "_".join(
         [path_components[-3], filename]
     )  # 3rd last is author, 2nd last is work, last sometimes duplicates work
+
+
+def preprocess(example, tokenizer):
+    p1_tokens = list(map(json.loads, example["p1_tokens"]))
+    p2_tokens = list(map(json.loads, example["p2_tokens"]))
+    sequences = list(zip(p1_tokens, p2_tokens))
+    labels = example["is_continuation"]
+    batch_encoding = tokenizer.batch_encode_plus(
+        sequences,
+        add_special_tokens=True,
+        padding="max_length",
+        truncation=True,
+        max_length=512,
+        return_tensors="pt",
+        return_token_type_ids=True,
+        return_attention_mask=True,
+    )
+
+    output = batch_encoding
+    output["labels"] = torch.tensor(labels, dtype=torch.uint8)
+    return output
