@@ -17,13 +17,18 @@ def tokenize_sequence(sequence: List, tokenizer: BertTokenizerFast) -> List:
 def save_split(
     split: str, paths: List[str], tokenizer: BertTokenizerFast, is_test: bool = False
 ):
-    pd.DataFrame(
+    df = pd.DataFrame(
         {
             "p1_tokens": [],
             "p2_tokens": [],
             "is_continuation": [],
         }
-    ).to_csv(f"{split}_df.csv", index=False, header=True, mode="w")
+    )
+    if is_test:
+        df["book_path"] = []
+        df["chapter_idx"] = []
+        df["paragraph_idx"] = []
+    df.to_csv(f"{split}_df.csv", index=False, header=True, mode="w")
     for path in tqdm(paths):
         with open(f"corpus/{path}", "r", encoding="utf8") as f:
             book = json.load(f)
@@ -98,5 +103,5 @@ if __name__ == "__main__":
     print(len(train))
     print(len(test))
     input("")
-    save_split("train", train, tokenizer)
+    # save_split("train", train, tokenizer)
     save_split("test_per_book", test, tokenizer, is_test=True)
