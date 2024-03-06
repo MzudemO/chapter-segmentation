@@ -1,27 +1,23 @@
 import datasets
 import torch
-from torch.optim import AdamW
-from torch.utils.data import DataLoader
-from tqdm import tqdm
 from transformers import (
     BertForNextSentencePrediction,
     BertTokenizer,
-    get_scheduler,
     TrainingArguments,
     Trainer,
-    TrainerCallback
+    TrainerCallback,
 )
-import transformers
 import evaluate
-import json
 import numpy as np
 
 from utils import preprocess
+
 
 class EvaluateFirstStepCallback(TrainerCallback):
     def on_step_begin(self, args, state, control, **kwargs):
         if state.global_step == 0:
             control.should_evaluate = True
+
 
 metric = evaluate.combine(["accuracy", "f1", "precision", "recall"])
 
@@ -48,7 +44,7 @@ if __name__ == "__main__":
         "batch_size": 8,
         "num_epochs": 4,
         "gradient_accumulation": 4,
-        "lr_scheduler_type": "linear"
+        "lr_scheduler_type": "linear",
     }
     print("Hyperparams: ", hyperparams)
 
