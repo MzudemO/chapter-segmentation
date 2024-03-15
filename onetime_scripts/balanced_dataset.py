@@ -3,7 +3,7 @@ from tqdm import tqdm
 
 dfs = []
 
-with pd.read_csv("train_df.csv", engine="c", chunksize=10**6) as reader:
+with pd.read_csv("train_df.csv", engine="c", chunksize=10**5) as reader:
     for chunk in tqdm(reader):
         chapter_breaks = chunk[chunk["is_continuation"] == False]
         nr_chapter_breaks = len(chapter_breaks)
@@ -12,7 +12,9 @@ with pd.read_csv("train_df.csv", engine="c", chunksize=10**6) as reader:
 
         continuations = chunk[chunk["is_continuation"] == True]
         print(len(continuations))
-        continuations = continuations.sample(n=nr_chapter_breaks, random_state=6948050)
+        continuations = continuations.sample(
+            n=nr_chapter_breaks * 3, random_state=6948050
+        )
         dfs.append(continuations)
 
 balanced_df = pd.concat(dfs)
@@ -22,4 +24,4 @@ print(balanced_df.head())
 print(len(balanced_df))
 print(len(balanced_df[balanced_df["is_continuation"] == False]))
 
-balanced_df.to_csv("balanced_train_df.csv")
+balanced_df.to_csv("3_1_train_df.csv")
