@@ -1,5 +1,14 @@
 from bs4 import BeautifulSoup, Tag
 import re
+import os
+
+
+def filename_from_path(path, extension="json"):
+    path_components = path.split(os.sep)
+    filename = os.extsep.join([path_components[-2], extension])
+    return "_".join(
+        [path_components[-3], filename]
+    )  # 3rd last is author, 2nd last is work, last sometimes duplicates work
 
 
 def tag_to_text(tag: Tag) -> str:

@@ -1,8 +1,7 @@
 import re
-import urllib
+from urllib.parse import urljoin
 from bs4 import BeautifulSoup, Tag
 from tqdm import tqdm
-from utils import filename_from_path
 from parse_utils import *
 import os
 import json
@@ -148,11 +147,17 @@ if __name__ == "__main__":
     with open(LOG_PATH, "w") as f:
         f.write("")
 
-    # root_path = "/mnt/c/Users/Moritz Lahann/Desktop/STUDIUM/Module IAS/Master's Thesis/gutenberg-edition16/info/texte/lesetips.html"
+    if not os.path.isdir("corpus"):
+        os.mkdir("corpus")
+
     parser = argparse.ArgumentParser(
         description="Parse dataset from raw GutenbergDE HTML."
     )
-    parser.add_argument("base_path", type=str, help="path to the GutenbergDE folder")
+    parser.add_argument(
+        "base_path",
+        type=str,
+        help="path to the GutenbergDE folder, e.g. ~/gutenberg-edition16",
+    )
     parser.add_argument(
         "--titlepage-info",
         action="store_true",
@@ -191,7 +196,6 @@ if __name__ == "__main__":
         work_dicts = []
 
         for genre_link in genre_links:
-            print(len(work_dicts))
             anchor_id = genre_link["href"].split("#")[-1]
             book_list = soup.find("a", id=anchor_id).parent.find_next_sibling("dl")
             current = book_list.find(["dt", "dd"])
@@ -211,7 +215,7 @@ if __name__ == "__main__":
                         "author": author,
                         "title": title,
                         "genre": re.sub(r"\s+", " ", genre_link.text),
-                        "webpath": urllib.parse.urljoin(
+                        "webpath": urljoin(
                             "https://www.projekt-gutenberg.org/info/texte/allworka.html",
                             relative_path,
                         ),
@@ -224,7 +228,6 @@ if __name__ == "__main__":
                     # continue loop
                     current = current.find_next_sibling("dt")
 
-        print(len(work_dicts))
         for work in tqdm(work_dicts):
             try:
                 parse_single_book(work, titlepage_info=args.titlepage_info)
