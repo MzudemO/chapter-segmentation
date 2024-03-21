@@ -1,17 +1,17 @@
-from typing import List
-import nltk
-from nltk.tokenize import word_tokenize, sent_tokenize
-import os
-import pandas as pd
 import json
+import math
+import os
+from typing import List
+
+import nltk
+import numpy as np
+import pandas as pd
+from nltk.tokenize import sent_tokenize, word_tokenize
+from scipy.signal import argrelmax
+from sklearn.linear_model import LinearRegression
+from sklearn.metrics import mean_absolute_error, mean_squared_error
 from sklearn.model_selection import train_test_split
 from tqdm import tqdm
-from sklearn import linear_model
-from sklearn.model_selection import train_test_split
-from sklearn.metrics import mean_squared_error, mean_absolute_error
-import numpy as np
-from scipy.signal import argrelmin, find_peaks, argrelmax
-import math
 
 
 def gather_split(split: str):
@@ -81,7 +81,7 @@ def gather_text_metrics(split: str) -> pd.DataFrame:
     return pd.read_pickle(split_file)
 
 
-def train_model(df: pd.DataFrame, columns: List[str]) -> linear_model.LinearRegression:
+def train_model(df: pd.DataFrame, columns: List[str]) -> LinearRegression:
     x = df[columns].to_numpy()
     y = np.array(df["chapter_count"]).reshape(-1, 1)
     x_train, x_test, y_train, y_test = train_test_split(
@@ -89,13 +89,13 @@ def train_model(df: pd.DataFrame, columns: List[str]) -> linear_model.LinearRegr
     )
     print(len(x_train))
     print(len(x_test))
-    model = linear_model.LinearRegression(fit_intercept=True)
+    model = LinearRegression(fit_intercept=True)
     model.fit(x_train, y_train)
     return model
 
 
 def predict(
-    model: linear_model.LinearRegression, df: pd.DataFrame, columns: List[str]
+    model: LinearRegression, df: pd.DataFrame, columns: List[str]
 ) -> pd.DataFrame:
     x = df[columns].to_numpy()
     y_pred = model.predict(x)
