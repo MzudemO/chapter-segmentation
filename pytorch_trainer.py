@@ -101,7 +101,7 @@ if __name__ == "__main__":
     # training
 
     training_args = TrainingArguments(
-        output_dir="test_trainer_2",
+        output_dir="trainer",
         per_device_train_batch_size=hyperparams["batch_size"],
         num_train_epochs=hyperparams["num_epochs"],
         learning_rate=hyperparams["learning_rate"],

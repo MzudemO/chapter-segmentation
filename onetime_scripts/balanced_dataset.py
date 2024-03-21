@@ -13,7 +13,7 @@ with pd.read_csv("train_df.csv", engine="c", chunksize=10**5) as reader:
         continuations = chunk[chunk["is_continuation"] == True]
         print(len(continuations))
         continuations = continuations.sample(
-            n=nr_chapter_breaks * 3, random_state=6948050
+            n=nr_chapter_breaks * 1, random_state=6948050
         )
         dfs.append(continuations)
 
